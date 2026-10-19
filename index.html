@@ -1,0 +1,864 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Heartscore</title>
+<meta name="theme-color" content="#C23B67">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Heartscore">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@500;600;700&display=swap">
+<style>
+/* Layout: a single phone-width column, score ring first, bottom tab bar like a native app */
+:root {
+  --bg: #FBF4F6;
+  --surface: #FFFFFF;
+  --sunk: #F4E8EC;
+  --ink: #2A1B23;
+  --muted: #7B6670;
+  --line: #EBDCE2;
+  --accent: #C23B67;
+  --accent-ink: #FFFFFF;
+  --accent-soft: #F8DDE6;
+  --good: #2F8F57;
+  --warn: #B86A1E;
+  --bad: #C43C3C;
+  --display: "Poppins", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --r: 16px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #171115; --surface: #221920; --sunk: #2B2028; --ink: #F6ECF0; --muted: #B7A1AB; --line: #3A2C34;
+    --accent: #F06C97; --accent-ink: #2A0F1A; --accent-soft: #42222F; --good: #5CC487; --warn: #E8A15A; --bad: #EE7373;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #171115; --surface: #221920; --sunk: #2B2028; --ink: #F6ECF0; --muted: #B7A1AB; --line: #3A2C34;
+  --accent: #F06C97; --accent-ink: #2A0F1A; --accent-soft: #42222F; --good: #5CC487; --warn: #E8A15A; --bad: #EE7373;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+:root { padding-top: env(safe-area-inset-top, 0px); }
+html, body { background: var(--bg); }
+body { margin: 0; color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+.wrap { max-width: 560px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 12px 108px; display: flex; flex-direction: column; gap: 14px; }
+h1, h2, h3 { font-family: var(--display); margin: 0; text-wrap: balance; font-weight: 600; }
+h1 { font-size: 22px; letter-spacing: -0.01em; }
+h2 { font-size: 18px; }
+h3 { font-size: 15px; }
+p { margin: 0; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.num { font-variant-numeric: tabular-nums; }
+.eyebrow { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 4px; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand svg { flex: none; }
+.who { font-size: 12.5px; padding: 5px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--ink); font-weight: 500; white-space: nowrap; }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.card.plain { background: transparent; border: 0; padding: 0; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.row.between { justify-content: space-between; }
+.grow { flex: 1 1 0; min-width: 0; }
+.banner { border-radius: var(--r); padding: 12px 14px; background: var(--accent-soft); display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+
+button, .btn { font: inherit; font-weight: 600; font-size: 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 10px 14px; cursor: pointer; min-height: 42px; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+button.ghost { background: transparent; border-color: transparent; color: var(--accent); padding-inline: 6px; }
+button.danger { color: var(--bad); }
+button.sm { min-height: 34px; padding: 6px 10px; font-size: 13px; border-radius: 10px; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.chip { font: inherit; font-size: 13px; font-weight: 500; border-radius: 999px; padding: 6px 12px; min-height: 34px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.chip.plus { color: var(--good); }
+.chip.minus { color: var(--bad); }
+
+label { display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: var(--muted); font-weight: 500; min-width: 0; }
+input, textarea, select { font: inherit; font-size: 15px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; width: 100%; min-width: 0; }
+textarea { resize: vertical; min-height: 64px; }
+input[type="range"] { padding: 0; accent-color: var(--accent); background: transparent; border: 0; height: 32px; }
+input[type="color"] { padding: 2px; height: 40px; }
+input[type="checkbox"] { width: auto; accent-color: var(--accent); }
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+
+/* Score ring */
+.hero { display: grid; grid-template-columns: 172px 1fr; gap: 16px; align-items: center; }
+@media (max-width: 400px) { .hero { grid-template-columns: 1fr; justify-items: center; text-align: center; } .hero .row { justify-content: center; } }
+.ringbox { position: relative; width: 172px; height: 172px; }
+.ringbox svg { width: 100%; height: 100%; display: block; }
+.ringval { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.ringval b { font-family: var(--display); font-size: 46px; line-height: 1; font-weight: 700; font-variant-numeric: tabular-nums; }
+.ringval span { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.band { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: var(--sunk); }
+.dot { width: 10px; height: 10px; border-radius: 50%; flex: none; display: inline-block; }
+.pass { color: var(--good); font-weight: 600; font-size: 13px; }
+.fail { color: var(--bad); font-weight: 600; font-size: 13px; }
+
+/* Entries */
+.list { display: flex; flex-direction: column; }
+.entry { display: grid; grid-template-columns: 54px 1fr auto; gap: 10px; align-items: start; padding: 10px 0; border-top: 1px solid var(--line); }
+.entry:first-child { border-top: 0; }
+.entry .t { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; padding-top: 2px; }
+.entry .pts { font-family: var(--display); font-weight: 600; font-variant-numeric: tabular-nums; }
+.pts.up { color: var(--good); } .pts.down { color: var(--bad); }
+.entry.dim { opacity: 0.55; }
+.tag { font-size: 11.5px; font-weight: 600; padding: 2px 7px; border-radius: 6px; background: var(--sunk); color: var(--muted); white-space: nowrap; }
+.tag.accent { background: var(--accent-soft); color: var(--ink); }
+.empty { color: var(--muted); font-size: 14px; padding: 6px 0; }
+
+/* Calendar */
+.cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+.cal .wd { font-size: 11px; text-align: center; color: var(--muted); font-weight: 600; letter-spacing: 0.04em; padding-bottom: 2px; }
+.cell { aspect-ratio: 1 / 1.08; max-width: 100%; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 2px; min-height: 0; font-weight: 500; }
+.cell .d { font-size: 11px; color: var(--muted); }
+.cell .s { font-family: var(--display); font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.cell.today { outline: 2px solid var(--accent); outline-offset: 1px; }
+.cell.out { visibility: hidden; }
+.cell.future { opacity: 0.45; }
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.stat { background: var(--sunk); border-radius: 12px; padding: 10px; min-width: 0; }
+.stat b { display: block; font-family: var(--display); font-size: 20px; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 11.5px; color: var(--muted); }
+@media (max-width: 400px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Challenges */
+.bar { height: 8px; background: var(--sunk); border-radius: 999px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+.ch-head { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.reward { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+
+/* Bottom tabs */
+.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: var(--surface); border-top: 1px solid var(--line); padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px)); padding-bottom: env(safe-area-inset-bottom, 0px); }
+.tabs .in { max-width: 560px; margin: 0 auto; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.tabs button { border: 0; background: none; border-radius: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 2px 10px; min-height: 58px; font-size: 11.5px; font-weight: 500; color: var(--muted); position: relative; }
+.tabs button[aria-current="page"] { color: var(--accent); font-weight: 600; }
+.tabs svg { width: 22px; height: 22px; }
+.badge { position: absolute; top: 4px; left: calc(50% + 6px); min-width: 18px; height: 18px; border-radius: 9px; background: var(--accent); color: var(--accent-ink); font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; padding: 0 5px; }
+
+/* Day sheet */
+.scrim { position: fixed; inset: 0; z-index: 40; background: rgba(20, 8, 14, 0.45); display: flex; align-items: flex-end; justify-content: center; }
+.sheet { background: var(--bg); width: 100%; max-width: 560px; max-height: 88%; overflow: auto; border-radius: 20px 20px 0 0; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-top: 16px; padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 14px; }
+
+.toast { position: fixed; z-index: 60; left: 50%; transform: translateX(-50%); bottom: calc(76px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 12px; font-size: 14px; font-weight: 500; max-width: calc(100% - 32px); }
+.bandrow { display: grid; grid-template-columns: 1fr; gap: 10px; padding: 12px; border-radius: 12px; background: var(--sunk); }
+@media (prefers-reduced-motion: no-preference) { .bar i, .ringbox circle { transition: stroke-dasharray 0.5s ease, width 0.5s ease; } }
+</style>
+</head>
+<body>
+<div class="wrap" id="main" aria-live="polite"></div>
+<nav class="tabs" aria-label="Sections"><div class="in" id="tabs"></div></nav>
+<div id="sheet" hidden></div>
+<div id="toast" class="toast" hidden></div>
+
+<script src="config.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  // App defaults, used until the shared settings are saved
+  const DEFAULTS = {
+    bands: [
+      { id: "red", name: "Fail", min: 0, max: 40, color: "#D64545", fail: true, activities: [{ title: "Vignesh plans a dinner or outing of Uma's choice", by: "Vignesh" }] },
+      { id: "orange", name: "Needs work", min: 41, max: 60, color: "#E8833A", fail: false, activities: [{ title: "30-minute walk together, phones away", by: "Either" }] },
+      { id: "yellow", name: "Good", min: 61, max: 80, color: "#E0B03A", fail: false, activities: [{ title: "Vignesh makes morning tea or breakfast", by: "Vignesh" }] },
+      { id: "green", name: "Great", min: 81, max: null, color: "#3E9E63", fail: false, activities: [{ title: "Uma picks a treat for Vignesh", by: "Uma" }] }
+    ],
+    quickReasons: [
+      { points: 5, reason: "Called at lunch" }, { points: 10, reason: "Helped at home" },
+      { points: -5, reason: "Forgot to reply" }, { points: -10, reason: "Late home" }
+    ],
+    moods: ["Happy", "Calm", "Neutral", "Tired", "Upset"],
+    reminder: "07:30",
+    close: "22:00"
+  };
+
+  const S = {
+    db: null, ready: false, error: null, isOwner: false, previewUma: false,
+    auth: "loading", user: null, who: null, emailMode: false, verifySent: false,
+    entriesLive: [], entriesOld: {}, loadedMonths: {}, cutoff: null, notif: "unknown",
+    config: null, days: {}, entries: [], challenges: [],
+    tab: "today", month: null, sheet: null, draftMood: undefined, editOpening: false, newCh: false, bandDraft: null
+  };
+  try { const t = localStorage.getItem("hs-tab"); if (t) S.tab = t; } catch (e) {}
+  if (["today", "calendar", "challenges", "requests", "settings"].includes(location.hash.slice(1))) S.tab = location.hash.slice(1);
+
+  // ---------- helpers ----------
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const pad = (n) => String(n).padStart(2, "0");
+  const keyOf = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const parseKey = (k) => { const [y, m, d] = k.split("-").map(Number); return new Date(y, m - 1, d); };
+  const today = () => keyOf(new Date());
+  const addDays = (k, n) => { const d = parseKey(k); d.setDate(d.getDate() + n); return keyOf(d); };
+  const fmtDay = (k, long) => parseKey(k).toLocaleDateString("en-IN", long ? { weekday: "long", day: "numeric", month: "long" } : { weekday: "short", day: "numeric", month: "short" });
+  const fmtShort = (k) => parseKey(k).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  const fmtTime = (iso) => { try { return new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }); } catch (e) { return ""; } };
+  const fmt12 = (hhmm) => { const [h, m] = (hhmm || "07:30").split(":").map(Number); const d = new Date(); d.setHours(h, m, 0, 0); return d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }); };
+  const nowMins = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
+  const toMins = (hhmm) => { const [h, m] = (hhmm || "00:00").split(":").map(Number); return h * 60 + m; };
+  const signed = (n) => (n > 0 ? "+" + n : String(n));
+  const dayIndex = (k) => Math.floor(Date.UTC(...k.split("-").map((v, i) => (i === 1 ? Number(v) - 1 : Number(v)))) / 864e5);
+  const val = (id) => { const el = $(id); return el ? el.value : ""; };
+  const intVal = (id) => { const v = val(id).trim(); if (v === "" || !/^-?\d+$/.test(v)) return null; return parseInt(v, 10); };
+  const clear = (...ids) => ids.forEach((id) => { const el = $(id); if (el) el.value = ""; });
+
+  const cfg = () => {
+    const c = S.config || {};
+    return {
+      bands: Array.isArray(c.bands) && c.bands.length ? c.bands : DEFAULTS.bands,
+      quickReasons: Array.isArray(c.quickReasons) ? c.quickReasons : DEFAULTS.quickReasons,
+      moods: Array.isArray(c.moods) && c.moods.length ? c.moods : DEFAULTS.moods,
+      reminder: c.reminder || DEFAULTS.reminder,
+      close: c.close || DEFAULTS.close
+    };
+  };
+  const role = () => S.who || "Uma";
+  const isUma = () => role() === "Uma";
+
+  // ---------- scoring ----------
+  const bands = () => cfg().bands.slice().sort((a, b) => a.min - b.min);
+  function bandFor(score) {
+    if (score == null) return null;
+    const bs = bands();
+    for (const b of bs) if (score >= b.min && (b.max == null || b.max === "" || score <= b.max)) return b;
+    return score < bs[0].min ? bs[0] : bs[bs.length - 1];
+  }
+  const entriesFor = (k) => S.entries.filter((e) => e.date === k).sort((a, b) => String(a.at).localeCompare(String(b.at)));
+  const approvedFor = (k) => entriesFor(k).filter((e) => e.status === "approved");
+  function scoreFor(k) {
+    const d = S.days[k];
+    if (S.cutoff && k < S.cutoff && !S.loadedMonths[k.slice(0, 7)] && d && typeof d.final === "number") return d.final;
+    const ap = approvedFor(k);
+    const hasOpen = d && typeof d.opening === "number";
+    if (!hasOpen && !ap.length) return null;
+    const s = (hasOpen ? d.opening : 0) + ap.reduce((t, e) => t + (Number(e.points) || 0), 0);
+    return Math.max(0, s);
+  }
+  const isClosed = (k) => k < today() || !!(S.days[k] && S.days[k].closed);
+  function passStreak() {
+    let k = isClosed(today()) ? today() : addDays(today(), -1), n = 0;
+    for (let i = 0; i < 3660; i++) {
+      const s = scoreFor(k); const b = bandFor(s);
+      if (s == null || !b || b.fail) break;
+      n++; k = addDays(k, -1);
+    }
+    return n;
+  }
+  function activityFor(k) {
+    const prev = addDays(k, -1);
+    const s = scoreFor(prev);
+    if (s == null) return null;
+    const b = bandFor(s);
+    const acts = (b.activities || []).filter((a) => a && a.title);
+    if (!acts.length) return { band: b, act: null };
+    return { band: b, act: acts[((dayIndex(k) % acts.length) + acts.length) % acts.length] };
+  }
+
+  // ---------- challenges ----------
+  function chProgress(c) {
+    const target = Math.max(1, Number(c.target) || 1);
+    if (c.type === "streak") {
+      const last = isClosed(today()) ? today() : addDays(today(), -1);
+      const end = c.end && c.end < last ? c.end : last;
+      let k = c.start, run = 0, best = 0, guard = 0;
+      while (k && k <= end && guard++ < 1000) {
+        const s = scoreFor(k);
+        if (s != null && s >= (Number(c.minScore) || 0)) { run++; best = Math.max(best, run); } else run = 0;
+        k = addDays(k, 1);
+      }
+      return { value: best >= target ? target : run, target };
+    }
+    return { value: Math.min(target, Number(c.progress) || 0), target };
+  }
+  function chStatus(c) {
+    if (c.status !== "active") return c.status;
+    const p = chProgress(c);
+    if (p.value >= p.target) return "awaiting";
+    if (c.end && c.end < today()) return "failed";
+    return "active";
+  }
+
+  // ---------- data ----------
+  async function saveDay(k, patch) {
+    const ref = S.db.doc("days/" + k);
+    if (S.days[k]) await ref.update(patch); else await ref.set(Object.assign({ date: k }, patch));
+  }
+  function addEntry(e) { return S.db.collection("entries").add(Object.assign({ at: new Date().toISOString() }, e)); }
+  function notify(to, title, body) {
+    return S.db.collection("outbox").add({ to, title, body: body || "", sent: false, createdAt: new Date().toISOString() }).catch(() => {});
+  }
+  function mergeEntries() {
+    const live = S.entriesLive, ids = new Set(live.map((e) => e.id));
+    S.entries = live.concat(Object.values(S.entriesOld).filter((e) => !ids.has(e.id)));
+  }
+  async function saveConfig(patch) { await S.db.doc("config/main").set(Object.assign({}, cfg(), patch)); }
+
+  async function run(fn, okMsg) {
+    if (!S.db) return toast("Sign in to make changes.");
+    try { await fn(); if (okMsg) toast(okMsg); }
+    catch (e) {
+      const code = e && e.code;
+      if (code === "permission-denied") toast("This account isn't allowed to change Heartscore.");
+      else if (code === "unavailable") toast("No connection right now. Try again in a moment.");
+      else toast("That didn't save: " + ((e && e.message) || "unknown error"));
+    }
+  }
+
+  let toastT;
+  function toast(msg) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => (t.hidden = true), 3200); }
+
+  // ---------- icons ----------
+  const I = {
+    today: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>',
+    calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>',
+    challenges: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg>',
+    requests: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13l2.5-7h11L20 13v5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18z"/><path d="M4 13h4.5l1 2h5l1-2H20"/></svg>',
+    settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>'
+  };
+
+  // ---------- views ----------
+  function ring(score) {
+    const r = 76, c = 2 * Math.PI * r;
+    const b = bandFor(score);
+    const frac = score == null ? 0 : Math.min(score, 100) / 100;
+    const color = b ? esc(b.color) : "var(--line)";
+    return `<div class="ringbox"><svg viewBox="0 0 180 180" aria-hidden="true">
+      <circle cx="90" cy="90" r="${r}" fill="none" stroke="var(--sunk)" stroke-width="14"/>
+      <circle cx="90" cy="90" r="${r}" fill="none" stroke="${color}" stroke-width="14" stroke-linecap="round" stroke-dasharray="${(c * frac).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 90 90)"/>
+      ${score != null && score > 100 ? `<circle cx="90" cy="90" r="${r - 13}" fill="none" stroke="${color}" stroke-width="3" stroke-dasharray="3 5" opacity="0.8"/>` : ""}
+    </svg><div class="ringval"><b>${score == null ? "–" : score}</b><span>${score == null ? "no score yet" : score > 100 ? "over 100" : "of 100"}</span></div></div>`;
+  }
+  const bandChip = (b) => (b ? `<span class="band"><i class="dot" style="background:${esc(b.color)}"></i>${esc(b.name)}</span>` : "");
+  const passTag = (b) => (b ? (b.fail ? '<span class="fail">Fail</span>' : '<span class="pass">Pass</span>') : "");
+
+  function entryRow(e, opts) {
+    const p = Number(e.points) || 0;
+    const tags = [];
+    if (e.type === "request") tags.push(`<span class="tag accent">Requested by Vignesh</span>`);
+    if (e.type === "bonus") tags.push(`<span class="tag accent">Challenge bonus</span>`);
+    if (e.status === "pending") tags.push(`<span class="tag">Waiting for Uma</span>`);
+    if (e.status === "declined") tags.push(`<span class="tag">Declined</span>`);
+    return `<div class="entry ${e.status !== "approved" ? "dim" : ""}">
+      <span class="t">${opts && opts.date ? esc(fmtShort(e.date)) : esc(fmtTime(e.at))}</span>
+      <div style="min-width:0"><div>${esc(e.reason || "No reason given")}</div>
+        ${tags.length ? `<div class="row" style="gap:6px;margin-top:4px">${tags.join("")}</div>` : ""}
+        ${e.reply ? `<div class="small muted" style="margin-top:4px">Uma: ${esc(e.reply)}</div>` : ""}</div>
+      <span class="pts ${p >= 0 ? "up" : "down"}">${signed(p)}</span></div>`;
+  }
+
+  function activityCard(k) {
+    const a = activityFor(k);
+    const d = S.days[k] || {};
+    if (!a) return `<section class="card"><div class="eyebrow">Today's activity</div><p class="muted">Set once yesterday has a score. The colour a day closes in decides the next day's activity.</p></section>`;
+    if (!a.act) return `<section class="card"><div class="eyebrow">Today's activity</div><p class="muted">Yesterday closed ${esc(a.band.name)}, which has no activity yet. Add one in Settings.</p></section>`;
+    return `<section class="card"><div class="row between"><div class="eyebrow">Today's activity</div>${bandChip(a.band)}</div>
+      <h3 style="font-size:17px">${esc(a.act.title)}</h3>
+      <div class="row between"><span class="muted small">Done by ${esc(a.act.by === "Either" ? "either of you" : a.act.by)} · because yesterday closed ${esc(a.band.name)}</span>
+      ${d.activityDone ? `<span class="pass">Done${d.activityDoneBy ? " by " + esc(d.activityDoneBy) : ""}</span>` : `<button class="sm" data-action="activity-done" data-k="${k}">Mark done</button>`}</div></section>`;
+  }
+
+  function viewToday() {
+    const k = today(), c = cfg(), d = S.days[k] || {};
+    const score = scoreFor(k), b = bandFor(score);
+    const ys = scoreFor(addDays(k, -1)), yb = bandFor(ys);
+    const hasOpen = typeof d.opening === "number";
+    const pendingReq = S.entries.filter((e) => e.status === "pending");
+    const pendingCh = S.challenges.filter((x) => x.status === "pending" || chStatus(x) === "awaiting");
+    let h = notifCard();
+
+    if (isUma() && !hasOpen && nowMins() >= toMins(c.reminder)) {
+      h += `<div class="banner"><span><b>Good morning, Uma.</b> Time to set today's score for Vignesh.</span></div>`;
+    }
+    if (isUma() && (pendingReq.length || pendingCh.length)) {
+      const n = pendingReq.length + pendingCh.length;
+      h += `<div class="banner"><span>Vignesh has ${n} ${n === 1 ? "thing" : "things"} waiting for your answer.</span><button class="sm" data-action="tab" data-v="requests">Review</button></div>`;
+    }
+
+    h += `<section class="card"><div class="hero">${ring(score)}<div style="display:flex;flex-direction:column;gap:8px;min-width:0">
+      <div class="eyebrow">${esc(fmtDay(k, true))}</div>
+      <h2>${score == null ? (isUma() ? "Start the day" : "Waiting for Uma") : esc(b.name)}</h2>
+      <div class="row">${bandChip(b)}${passTag(b)}${d.closed ? '<span class="tag">Day closed</span>' : ""}</div>
+      ${hasOpen ? `<p class="small muted">Opened at ${d.opening}${d.yesterdayFeel ? " · yesterday " + esc(d.yesterdayFeel.toLowerCase()) : ""}${d.mood ? " · " + esc(d.mood) : ""}</p>` : ""}
+      ${ys != null ? `<p class="small muted">Yesterday closed at <span class="num">${ys}</span> (${esc(yb.name)})</p>` : ""}
+    </div></div></section>`;
+
+    if (isUma()) {
+      if (!hasOpen || S.editOpening) {
+        const mood = S.draftMood !== undefined ? S.draftMood : d.mood || null;
+        const yf = S.draftYest !== undefined ? S.draftYest : d.yesterdayFeel || null;
+        h += `<section class="card"><div class="row between"><h3>${hasOpen ? "Change today's opening score" : "Today's opening score for Vignesh"}</h3>${hasOpen ? '<button class="ghost sm" data-action="cancel-opening">Cancel</button>' : ""}</div>
+          <p class="small muted">Every day starts fresh. You decide the opening score from how yesterday ended and your mindset this morning. Nothing is carried over.</p>
+          <div><div class="eyebrow" style="margin-bottom:6px">1 · How did yesterday end?</div>
+            <div class="row" style="gap:6px">${["Ended well", "Okay", "Ended badly"].map((m) => `<button class="chip" data-action="yest" data-v="${m}" aria-pressed="${yf === m}">${m}</button>`).join("")}</div>
+            ${ys != null ? `<p class="small muted" style="margin-top:6px">For reference, yesterday's final score was <span class="num">${ys}</span>.</p>` : ""}</div>
+          <div><div class="eyebrow" style="margin-bottom:6px">2 · Your mindset this morning</div><div class="row" style="gap:6px">${c.moods.map((m) => `<button class="chip" data-action="mood" data-v="${esc(m)}" aria-pressed="${mood === m}">${esc(m)}</button>`).join("")}</div></div>
+          <label for="op-num"><span class="eyebrow">3 · Opening score (0 to 100)</span><input id="op-num" type="number" min="0" max="100" inputmode="numeric" value="${hasOpen ? d.opening : ""}" placeholder="Type today's score" style="font-family:var(--display);font-size:24px;font-weight:600;max-width:200px"></label>
+          <label for="op-note">Note (optional)<textarea id="op-note" rows="2" placeholder="Anything about yesterday or this morning">${hasOpen ? esc(d.note || "") : ""}</textarea></label>
+          <button class="primary" data-action="save-opening">${hasOpen ? "Save change" : "Set today's opening score"}</button></section>`;
+      } else {
+        h += `<div class="row" style="justify-content:flex-end"><button class="ghost sm" data-action="edit-opening">Change today's opening score</button></div>`;
+      }
+
+      h += `<section class="card"><h3>Add or take away points</h3>
+        ${c.quickReasons.length ? `<div class="row" style="gap:6px">${c.quickReasons.map((q, i) => `<button class="chip ${q.points >= 0 ? "plus" : "minus"}" data-action="quick" data-i="${i}">${signed(q.points)} ${esc(q.reason)}</button>`).join("")}</div>` : ""}
+        <div class="fields" style="grid-template-columns:96px 1fr"><label for="adj-amt">Points<input id="adj-amt" type="number" min="1" inputmode="numeric" placeholder="5"></label>
+        <label for="adj-reason">Reason<input id="adj-reason" type="text" maxlength="140" placeholder="What happened?"></label></div>
+        <div class="row"><button class="grow" data-action="adj" data-sign="-1" style="color:var(--bad)">− Take away</button><button class="grow primary" data-action="adj" data-sign="1">+ Add</button></div></section>`;
+    } else {
+      h += hasOpen
+        ? `<section class="card"><div class="eyebrow">Today's opening score</div><div class="row between"><span>Uma started today at <b class="num">${d.opening}</b></span>${bandChip(bandFor(d.opening))}</div>
+            <p class="small muted">${[d.yesterdayFeel ? "Yesterday: " + esc(d.yesterdayFeel) : "", d.mood ? "Her mindset: " + esc(d.mood) : ""].filter(Boolean).join(" · ") || "No mood noted"}${d.note ? " · “" + esc(d.note) + "”" : ""}</p></section>`
+        : `<section class="card"><div class="eyebrow">Today's opening score</div><p>Not set yet. Each morning Uma types a fresh opening score on her phone, based on how yesterday ended and her mindset today.</p>${S.isOwner ? '<button class="primary" data-action="as-uma">Switch to Uma\'s view to enter it</button>' : ""}</section>`;
+      h += `<section class="card"><h3>Ask Uma for points</h3><p class="small muted">Uma gets your request and can approve it, decline it or change the amount.</p>
+        <div class="fields" style="grid-template-columns:96px 1fr"><label for="rq-amt">Points<input id="rq-amt" type="number" inputmode="numeric" placeholder="10"></label>
+        <label for="rq-reason">Reason<input id="rq-reason" type="text" maxlength="140" placeholder="e.g. Fixed the leaking tap"></label></div>
+        <button class="primary" data-action="request">Send request</button></section>`;
+    }
+
+    h += activityCard(k);
+
+    const ents = entriesFor(k);
+    h += `<section class="card"><div class="row between"><h3>Today so far</h3><span class="small muted num">${ents.filter((e) => e.status === "approved").length} changes</span></div>
+      <div class="list">${hasOpen ? `<div class="entry"><span class="t">${esc(fmtTime(d.setAt))}</span><div>Morning score${d.mood ? " · " + esc(d.mood) : ""}</div><span class="pts">${d.opening}</span></div>` : ""}
+      ${ents.map((e) => entryRow(e)).join("") || (hasOpen ? "" : '<p class="empty">Nothing yet today.</p>')}</div></section>`;
+
+    if (isUma()) {
+      h += d.closed
+        ? `<section class="card"><div class="row between"><span>Today is closed at <b class="num">${score == null ? "–" : score}</b>.</span><button class="sm" data-action="reopen">Reopen</button></div></section>`
+        : `<section class="card"><div class="row between"><span class="small muted">The day closes on its own at midnight. Close it now to send the report.</span><button class="sm" data-action="close-day" ${score == null ? "disabled" : ""}>Close today</button></div></section>`;
+    }
+    return h;
+  }
+
+  function viewCalendar() {
+    const t = today();
+    if (!S.month) S.month = t.slice(0, 7);
+    const [y, m] = S.month.split("-").map(Number);
+    const first = new Date(y, m - 1, 1), daysIn = new Date(y, m, 0).getDate();
+    const offset = (first.getDay() + 6) % 7;
+    const scored = [];
+    let cells = "";
+    for (let i = 0; i < offset; i++) cells += '<div class="cell out" aria-hidden="true"></div>';
+    for (let d = 1; d <= daysIn; d++) {
+      const k = `${y}-${pad(m)}-${pad(d)}`;
+      const s = scoreFor(k), b = bandFor(s);
+      if (s != null && isClosed(k)) scored.push({ k, s, b });
+      const style = b ? `background:color-mix(in srgb, ${esc(b.color)} 30%, var(--surface));border-color:color-mix(in srgb, ${esc(b.color)} 55%, var(--surface))` : "";
+      cells += `<button class="cell ${k === t ? "today" : ""} ${k > t ? "future" : ""}" style="${style}" data-action="open-day" data-k="${k}" ${k > t ? "disabled" : ""} aria-label="${esc(fmtDay(k))}${s != null ? ", score " + s + ", " + esc(b.name) : ""}"><span class="d">${d}</span><span class="s">${s == null ? "" : s}</span></button>`;
+    }
+    const avg = scored.length ? Math.round(scored.reduce((a, x) => a + x.s, 0) / scored.length) : null;
+    const passN = scored.filter((x) => !x.b.fail).length;
+    const counts = bands().map((b) => ({ b, n: scored.filter((x) => x.b && x.b.id === b.id).length }));
+    const monthName = first.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+    return `<section class="card"><div class="row between"><button class="sm" data-action="month" data-d="-1" aria-label="Previous month">‹</button><h2>${esc(monthName)}</h2><button class="sm" data-action="month" data-d="1" aria-label="Next month" ${S.month >= t.slice(0, 7) ? "disabled" : ""}>›</button></div>
+      <div class="stats"><div class="stat"><b>${avg == null ? "–" : avg}</b><span>Average</span></div><div class="stat"><b>${scored.length ? Math.round((passN / scored.length) * 100) + "%" : "–"}</b><span>Pass rate</span></div><div class="stat"><b>${scored.length - passN}</b><span>Fail days</span></div><div class="stat"><b>${passStreak()}</b><span>Pass streak</span></div></div>
+      <div class="cal">${["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((w) => `<div class="wd">${w}</div>`).join("")}${cells}</div>
+      <div class="row" style="gap:8px">${counts.map((x) => `<span class="band"><i class="dot" style="background:${esc(x.b.color)}"></i>${esc(x.b.name)} <span class="num muted">${x.n}</span></span>`).join("")}</div>
+      <p class="small muted">Tap a day to see its report.</p></section>`;
+  }
+
+  function challengeCard(c) {
+    const st = chStatus(c), p = chProgress(c);
+    const pct = Math.round((p.value / p.target) * 100);
+    const typeLabel = c.type === "streak" ? `Streak · ${p.target} days in a row at ${c.minScore}+` : c.type === "count" ? `Count · ${p.target} times` : "One-off";
+    const statusLabel = { pending: "Waiting for Uma's approval", active: "Active", awaiting: "Done · waiting for Uma to confirm", achieved: "Achieved", failed: "Not achieved", declined: "Declined", cancelled: "Cancelled" }[st] || st;
+    let actions = "";
+    if (st === "pending" && isUma()) actions = `<button class="sm" data-action="ch-decline" data-id="${c.id}">Decline</button><button class="sm primary" data-action="ch-approve" data-id="${c.id}">Approve</button>`;
+    else if (st === "active" && c.type === "count") actions = `<button class="sm" data-action="ch-log" data-id="${c.id}">+1 done</button>`;
+    else if (st === "active" && c.type === "oneoff") actions = `<button class="sm" data-action="ch-log" data-id="${c.id}">Mark done</button>`;
+    if (st === "awaiting" && isUma()) actions = `<button class="sm primary" data-action="ch-confirm" data-id="${c.id}">Confirm and add ${signed(Number(c.bonus) || 0)}</button>`;
+    if (st === "achieved") actions = `<label class="row" style="flex-direction:row;gap:8px;color:var(--ink)"><input type="checkbox" id="rg-${c.id}" data-action="ch-reward" data-id="${c.id}" ${c.rewardGiven ? "checked" : ""}> Reward given</label>`;
+    const cancel = (st === "active" || st === "pending") && (isUma() || c.createdBy === role()) ? `<button class="ghost sm danger" data-action="ch-cancel" data-id="${c.id}">Cancel</button>` : "";
+    return `<article class="card"><div class="ch-head"><div style="min-width:0"><h3 style="font-size:16px">${esc(c.title)}</h3><p class="small muted">${esc(typeLabel)} · for ${esc(c.who === "Both" ? "both of you" : c.who)}</p></div><span class="tag ${st === "achieved" || st === "awaiting" ? "accent" : ""}">${esc(statusLabel)}</span></div>
+      ${st !== "declined" && st !== "cancelled" ? `<div><div class="bar"><i style="width:${pct}%"></i></div><div class="row between small muted" style="margin-top:4px"><span class="num">${p.value} of ${p.target}</span><span>${esc(fmtShort(c.start))} to ${esc(fmtShort(c.end))}</span></div></div>` : ""}
+      <div class="reward"><span class="pts up num" style="font-family:var(--display);font-weight:600">${signed(Number(c.bonus) || 0)}</span><span class="muted">bonus</span>${c.reward ? `<span>· ${esc(c.reward)}</span>` : ""}</div>
+      ${actions || cancel ? `<div class="row between">${cancel || "<span></span>"}<div class="row">${actions}</div></div>` : ""}</article>`;
+  }
+
+  function viewChallenges() {
+    const all = S.challenges.slice().sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+    const open = all.filter((c) => ["pending", "active", "awaiting"].includes(chStatus(c)));
+    const past = all.filter((c) => !["pending", "active", "awaiting"].includes(chStatus(c)));
+    const t = today();
+    let h = `<div class="row between"><h1>Challenges</h1><button class="${S.newCh ? "" : "primary"} sm" data-action="new-ch">${S.newCh ? "Close" : "New challenge"}</button></div>`;
+    if (S.newCh) {
+      h += `<section class="card"><h3>New challenge</h3>${!isUma() ? '<p class="small muted">Uma approves it before it starts.</p>' : ""}
+        <label for="ch-title">Name<input id="ch-title" type="text" maxlength="80" placeholder="e.g. 7 green days in a row"></label>
+        <div class="fields"><label for="ch-type">Type<select id="ch-type"><option value="streak">Streak of scores</option><option value="count">Do it a number of times</option><option value="oneoff">One-off task</option></select></label>
+        <label for="ch-who">Who does it<select id="ch-who"><option>Vignesh</option><option>Uma</option><option>Both</option></select></label></div>
+        <div class="fields"><label for="ch-target">Days / times<input id="ch-target" type="number" min="1" value="7"></label>
+        <label for="ch-min">Score each day (streaks)<input id="ch-min" type="number" min="0" value="81"></label></div>
+        <div class="fields"><label for="ch-start">Starts<input id="ch-start" type="date" value="${t}"></label><label for="ch-end">Ends<input id="ch-end" type="date" value="${addDays(t, 13)}"></label></div>
+        <div class="fields" style="grid-template-columns:110px 1fr"><label for="ch-bonus">Bonus points<input id="ch-bonus" type="number" min="0" value="15"></label><label for="ch-reward">Reward if achieved<input id="ch-reward" type="text" maxlength="120" placeholder="e.g. Weekend trip"></label></div>
+        <button class="primary" data-action="create-ch">${isUma() ? "Start challenge" : "Send to Uma for approval"}</button></section>`;
+    }
+    h += open.length ? open.map(challengeCard).join("") : `<section class="card"><p class="muted">No active challenges. Create one: a streak like “7 green days in a row”, something to do a number of times, or a one-off surprise. Each carries bonus points and a reward.</p></section>`;
+    if (past.length) h += `<h2 style="margin-top:8px">Past challenges</h2>` + past.map(challengeCard).join("");
+    return h;
+  }
+
+  function viewRequests() {
+    const reqs = S.entries.filter((e) => e.type === "request").sort((a, b) => String(b.at).localeCompare(String(a.at)));
+    const pend = reqs.filter((e) => e.status === "pending");
+    const chPend = S.challenges.filter((c) => c.status === "pending" || chStatus(c) === "awaiting");
+    let h = `<h1>Requests</h1>`;
+    if (isUma()) {
+      h += `<p class="muted">Point requests and challenges from Vignesh waiting for your answer.</p>`;
+      if (!pend.length && !chPend.length) h += `<section class="card"><p class="muted">Nothing waiting. When Vignesh asks for points or creates a challenge, it shows up here.</p></section>`;
+      h += pend.map((e) => `<section class="card"><div class="row between"><span class="small muted">${esc(fmtDay(e.date))} · ${esc(fmtTime(e.at))}</span><span class="pts ${e.points >= 0 ? "up" : "down"}" style="font-family:var(--display);font-weight:600">${signed(Number(e.points) || 0)}</span></div>
+        <p>${esc(e.reason || "No reason given")}</p>
+        <div class="fields" style="grid-template-columns:96px 1fr"><label for="ra-${e.id}">Give<input id="ra-${e.id}" type="number" value="${Number(e.points) || 0}"></label><label for="rr-${e.id}">Reply (optional)<input id="rr-${e.id}" type="text" maxlength="140"></label></div>
+        <div class="row" style="justify-content:flex-end"><button class="sm" data-action="req-decline" data-id="${e.id}">Decline</button><button class="sm primary" data-action="req-approve" data-id="${e.id}">Approve</button></div></section>`).join("");
+      h += chPend.map(challengeCard).join("");
+    } else {
+      h += `<p class="muted">Your point requests and what Uma decided.</p>`;
+      h += reqs.length ? `<section class="card"><div class="list">${reqs.slice(0, 60).map((e) => entryRow(e, { date: true })).join("")}</div></section>` : `<section class="card"><p class="muted">No requests yet. Ask for points from the Today tab.</p></section>`;
+    }
+    const hist = reqs.filter((e) => e.status !== "pending");
+    if (isUma() && hist.length) h += `<h2 style="margin-top:8px">Answered</h2><section class="card"><div class="list">${hist.slice(0, 40).map((e) => entryRow(e, { date: true })).join("")}</div></section>`;
+    return h;
+  }
+
+  function viewSettings() {
+    const c = cfg();
+    if (!S.bandDraft) S.bandDraft = JSON.parse(JSON.stringify(bands()));
+    let h = `<h1>Settings</h1>`;
+    h += `<section class="card"><h3>Score bands</h3><p class="small muted">The final score picks the band, its colour on the calendar and the next day's activity. Leave “To” empty for no upper limit. Activities: one per line as <span class="num">Activity | Vignesh, Uma or Either</span>.</p>
+      ${S.bandDraft.map((b, i) => `<div class="bandrow"><div class="fields" style="grid-template-columns:1fr 70px 70px 56px"><label for="b-name-${i}">Name<input id="b-name-${i}" type="text" value="${esc(b.name)}"></label><label for="b-min-${i}">From<input id="b-min-${i}" type="number" value="${b.min}"></label><label for="b-max-${i}">To<input id="b-max-${i}" type="number" value="${b.max == null ? "" : b.max}"></label><label for="b-col-${i}">Colour<input id="b-col-${i}" type="color" value="${esc(b.color)}"></label></div>
+        <label class="row" style="flex-direction:row;gap:8px;color:var(--ink)"><input type="checkbox" id="b-fail-${i}" ${b.fail ? "checked" : ""}> Counts as a fail</label>
+        <label for="b-act-${i}">Activities<textarea id="b-act-${i}" rows="2">${esc((b.activities || []).map((a) => a.title + " | " + a.by).join("\n"))}</textarea></label>
+        <div class="row" style="justify-content:flex-end"><button class="ghost sm danger" data-action="band-del" data-i="${i}" ${S.bandDraft.length <= 1 ? "disabled" : ""}>Remove band</button></div></div>`).join("")}
+      <div class="row between"><button class="sm" data-action="band-add">Add band</button><button class="primary" data-action="band-save">Save bands</button></div></section>`;
+    h += `<section class="card"><h3>Daily routine</h3><div class="fields"><label for="s-rem">Morning reminder<input id="s-rem" type="time" value="${esc(c.reminder)}"></label><label for="s-close">Day close<input id="s-close" type="time" value="${esc(c.close)}"></label></div>
+      <label for="s-moods">Mood choices (comma separated)<input id="s-moods" type="text" value="${esc(c.moods.join(", "))}"></label>
+      <label for="s-quick">Quick reasons, one per line as <span class="num">+5 Called at lunch</span><textarea id="s-quick" rows="4">${esc(c.quickReasons.map((q) => signed(q.points) + " " + q.reason).join("\n"))}</textarea></label>
+      <button class="primary" data-action="routine-save">Save</button>
+      <p class="small muted">Uma gets a notification at the reminder time if today's opening score isn't set yet. It can arrive up to about 15 minutes late.</p></section>`;
+    if (S.isOwner) {
+      h += `<section class="card"><h3>Preview</h3><p class="small muted">See and test the app the way Uma sees it. Anything you do in preview is saved as Uma's.</p>
+        <label class="row" style="flex-direction:row;gap:8px;color:var(--ink)"><input type="checkbox" id="s-preview" data-action="preview" ${S.previewUma ? "checked" : ""}> Use Heartscore as Uma on this device</label></section>`;
+    }
+    h += `<section class="card"><h3>Account</h3><p class="small muted">Signed in as ${esc(S.user && S.user.email)} (${esc(role())}).</p>
+      <p class="small muted">Notifications on this phone: ${S.notif === "on" ? "on" : S.notif === "denied" ? "blocked in browser settings" : iosNeedsInstall() ? "open from the Home Screen icon to turn on" : "off"}</p>
+      <div class="row">${S.notif !== "on" && !iosNeedsInstall() && S.notif !== "denied" && S.notif !== "unsupported" ? '<button class="sm" data-action="notif-on">Turn on notifications</button>' : ""}<button class="sm" data-action="sign-out">Sign out</button></div></section>`;
+    return h;
+  }
+
+  function viewSheet(k) {
+    const d = S.days[k] || {}, s = scoreFor(k), b = bandFor(s), act = activityFor(k);
+    const ents = entriesFor(k);
+    return `<div class="scrim" data-action="close-sheet"><div class="sheet" role="dialog" aria-modal="true" aria-label="Report for ${esc(fmtDay(k, true))}" data-stop="1">
+      <div class="row between"><div><div class="eyebrow">Daily report</div><h2>${esc(fmtDay(k, true))}</h2></div><button class="sm" data-action="close-sheet">Close</button></div>
+      <section class="card"><div class="hero">${ring(s)}<div style="display:flex;flex-direction:column;gap:8px">
+        <div class="row">${bandChip(b)}${passTag(b)}</div>
+        ${typeof d.opening === "number" ? `<p class="small">Opening <b class="num">${d.opening}</b>${d.yesterdayFeel ? " · yesterday " + esc(d.yesterdayFeel.toLowerCase()) : ""}${d.mood ? " · " + esc(d.mood) : ""}</p>` : '<p class="small muted">No opening score set</p>'}
+        ${d.note ? `<p class="small muted">“${esc(d.note)}”</p>` : ""}
+        <p class="small muted">${isClosed(k) ? "Final score" : "Running score, day still open"}</p></div></div></section>
+      <section class="card"><h3>Changes during the day</h3><div class="list">${ents.map((e) => entryRow(e)).join("") || '<p class="empty">No changes.</p>'}</div></section>
+      <section class="card"><h3>Activity</h3>${act && act.act ? `<p>${esc(act.act.title)} <span class="muted small">· ${esc(act.act.by)}</span></p><p class="${d.activityDone ? "pass" : "muted small"}">${d.activityDone ? "Done" : "Not marked done"}</p>` : '<p class="muted small">No activity that day.</p>'}
+      ${b && b.activities && b.activities.length ? `<p class="small muted">Next day's activity from ${esc(b.name)}: ${esc(b.activities[((dayIndex(addDays(k, 1)) % b.activities.length) + b.activities.length) % b.activities.length].title)}</p>` : ""}</section>
+    </div></div>`;
+  }
+
+  function viewSignIn() {
+    return `<section class="card" style="gap:16px"><h2>Welcome to Heartscore</h2><p class="muted">Sign in with the Google account Vignesh set up for you. You only do this once on each phone.</p>
+      <button class="primary" data-action="google-in">Continue with Google</button>
+      <button class="ghost" data-action="email-mode">${S.emailMode ? "Hide email sign-in" : "Use email and password instead"}</button>
+      ${S.emailMode ? `<div style="display:flex;flex-direction:column;gap:10px"><label for="li-email">Email<input id="li-email" type="email" autocomplete="email"></label><label for="li-pw">Password (6+ characters)<input id="li-pw" type="password" autocomplete="current-password"></label><button data-action="email-in">Sign in</button><p class="small muted">First time? This creates your account and sends a link to confirm your email.</p></div>` : ""}</section>`;
+  }
+
+  // ---------- render ----------
+  function render() {
+    const main = $("main");
+    // keep what people are typing across live updates
+    const keep = {};
+    main.querySelectorAll("input[id], textarea[id], select[id]").forEach((el) => { if (el.type !== "checkbox") keep[el.id] = el.value; });
+    const focused = document.activeElement && document.activeElement.id;
+
+    const t = role();
+    let body = `<header class="topbar"><div class="brand"><svg width="30" height="30" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-8-5-8-11.2A4.6 4.6 0 0 1 12 7a4.6 4.6 0 0 1 8 2.8C20 16 12 21 12 21z" fill="var(--accent)"/></svg><h1 style="font-size:20px">Heartscore</h1></div>
+      ${S.ready ? (t === "Uma" && S.isOwner ? `<button class="who" data-action="as-me" style="border:0;cursor:pointer">Viewing as Uma · switch back</button>` : `<span class="who">${t}</span>`) : ""}</header>`;
+    if (S.auth === "out") body += viewSignIn();
+    else if (S.auth === "verify") body += `<section class="card"><h2>Check your email</h2><p class="muted">We sent a link to ${esc(S.user && S.user.email)}. Tap it, then come back here.</p><button class="primary" data-action="verified">I've tapped the link</button><div class="row"><button class="sm" data-action="resend">Send again</button><button class="sm" data-action="sign-out">Use another account</button></div></section>`;
+    else if (S.auth === "denied") body += `<section class="card"><h2>This account isn't on Heartscore</h2><p class="muted">${esc(S.user && S.user.email)} isn't one of the two accounts set up for Heartscore. Sign in with the account Vignesh set up for you.</p><button data-action="sign-out">Sign out and try another account</button></section>`;
+    else if (S.error) body += `<section class="card"><h2>Something went wrong</h2><p class="muted">${esc(S.error)}</p><button class="sm" data-action="sign-out">Sign out</button></section>`;
+    else if (!S.ready) body += `<section class="card"><p class="muted">Loading your scores…</p></section>`;
+    else body += { today: viewToday, calendar: viewCalendar, challenges: viewChallenges, requests: viewRequests, settings: viewSettings }[S.tab]();
+    main.innerHTML = body;
+
+    Object.keys(keep).forEach((id) => { const el = $(id); if (el && el.type !== "date" || (el && keep[id])) el.value = keep[id]; });
+    if (focused && $(focused)) { try { $(focused).focus({ preventScroll: true }); } catch (e) {} }
+
+    const pendingN = isUma() ? S.entries.filter((e) => e.status === "pending").length + S.challenges.filter((c) => c.status === "pending" || chStatus(c) === "awaiting").length : 0;
+    $("tabs").parentElement.hidden = !S.ready;
+    $("tabs").innerHTML = [["today", "Today"], ["calendar", "Calendar"], ["challenges", "Challenges"], ["requests", "Requests"], ["settings", "Settings"]]
+      .map(([id, label]) => `<button data-action="tab" data-v="${id}" ${S.tab === id ? 'aria-current="page"' : ""}>${I[id]}<span>${label}</span>${id === "requests" && pendingN ? `<span class="badge">${pendingN}</span>` : ""}</button>`).join("");
+
+    const sh = $("sheet");
+    if (S.sheet) { sh.innerHTML = viewSheet(S.sheet); sh.hidden = false; } else { sh.hidden = true; sh.innerHTML = ""; }
+  }
+
+  // ---------- actions ----------
+  function readBands() {
+    if (!S.bandDraft) return;
+    S.bandDraft = S.bandDraft.map((b, i) => {
+      if (!$("b-name-" + i)) return b;
+      const maxRaw = val("b-max-" + i).trim();
+      return {
+        id: b.id || "b" + Date.now() + i,
+        name: val("b-name-" + i).trim() || "Band",
+        min: parseInt(val("b-min-" + i), 10) || 0,
+        max: maxRaw === "" ? null : parseInt(maxRaw, 10),
+        color: /^#[0-9a-fA-F]{6}$/.test(val("b-col-" + i)) ? val("b-col-" + i) : "#999999",
+        fail: !!($("b-fail-" + i) && $("b-fail-" + i).checked),
+        activities: val("b-act-" + i).split("\n").map((l) => l.trim()).filter(Boolean).map((l) => {
+          const parts = l.split("|"); const by = (parts[1] || "Either").trim();
+          return { title: parts[0].trim(), by: ["Vignesh", "Uma", "Either"].find((x) => x.toLowerCase() === by.toLowerCase()) || "Either" };
+        })
+      };
+    });
+  }
+
+  const A = {
+    tab(b) { S.tab = b.dataset.v; S.sheet = null; S.bandDraft = null; try { localStorage.setItem("hs-tab", S.tab); } catch (e) {} render(); window.scrollTo(0, 0); },
+    mood(b) { const v = b.dataset.v; const cur = S.draftMood !== undefined ? S.draftMood : (S.days[today()] || {}).mood; S.draftMood = cur === v ? null : v; render(); },
+    yest(b) { const v = b.dataset.v; const cur = S.draftYest !== undefined ? S.draftYest : (S.days[today()] || {}).yesterdayFeel; S.draftYest = cur === v ? null : v; render(); },
+    "edit-opening"() { S.editOpening = true; S.draftMood = undefined; S.draftYest = undefined; render(); },
+    "cancel-opening"() { S.editOpening = false; S.draftMood = undefined; S.draftYest = undefined; clear("op-num", "op-note"); render(); },
+    "save-opening"() {
+      const v = intVal("op-num");
+      if (v == null || v < 0 || v > 100) return toast("Type today's opening score, from 0 to 100.");
+      const d = S.days[today()] || {};
+      const mood = S.draftMood !== undefined ? S.draftMood : d.mood || null;
+      const note = val("op-note").trim();
+      const yesterdayFeel = S.draftYest !== undefined ? S.draftYest : d.yesterdayFeel || null;
+      run(async () => {
+        await saveDay(today(), { opening: v, mood, yesterdayFeel, note, setAt: d.setAt || new Date().toISOString() });
+        S.editOpening = false; S.draftMood = undefined; S.draftYest = undefined; clear("op-num", "op-note");
+      }, "Today's opening score is set");
+    },
+    quick(b) { const q = cfg().quickReasons[Number(b.dataset.i)]; if (q) run(() => addEntry({ date: today(), points: q.points, reason: q.reason, type: "normal", status: "approved", by: "Uma" }), `${signed(q.points)} added`); },
+    adj(b) {
+      const n = intVal("adj-amt"), reason = val("adj-reason").trim();
+      if (!n || n <= 0) return toast("Enter how many points.");
+      if (!reason) return toast("Add a short reason.");
+      const pts = n * Number(b.dataset.sign);
+      run(async () => { await addEntry({ date: today(), points: pts, reason, type: "normal", status: "approved", by: "Uma" }); clear("adj-amt", "adj-reason"); }, `${signed(pts)} saved`);
+    },
+    request() {
+      const n = intVal("rq-amt"), reason = val("rq-reason").trim();
+      if (!n) return toast("Enter how many points you're asking for.");
+      if (!reason) return toast("Add a reason so Uma knows what it's for.");
+      run(async () => { await addEntry({ date: today(), points: n, reason, type: "request", status: "pending", by: "Vignesh" }); clear("rq-amt", "rq-reason"); notify("Uma", `Vignesh asked for ${signed(n)} points`, reason); }, "Sent to Uma");
+    },
+    "req-approve"(b) {
+      const id = b.dataset.id, n = intVal("ra-" + id), reply = val("rr-" + id).trim();
+      if (n == null) return toast("Enter the points to give.");
+      const e0 = S.entries.find((x) => x.id === id) || {};
+      run(async () => { await S.db.doc("entries/" + id).update({ status: "approved", points: n, reply, decidedAt: new Date().toISOString() }); notify("Vignesh", `Uma approved ${signed(n)} points`, [e0.reason, reply].filter(Boolean).join(" · ")); }, "Approved");
+    },
+    "req-decline"(b) { const id = b.dataset.id, reply = val("rr-" + id).trim(), e0 = S.entries.find((x) => x.id === id) || {}; run(async () => { await S.db.doc("entries/" + id).update({ status: "declined", reply, decidedAt: new Date().toISOString() }); notify("Vignesh", `Uma declined your ${signed(Number(e0.points) || 0)} request`, [e0.reason, reply].filter(Boolean).join(" · ")); }, "Declined"); },
+    "activity-done"(b) {
+      const k = b.dataset.k, a = activityFor(k);
+      run(() => saveDay(k, { activityDone: true, activityTitle: a && a.act ? a.act.title : "", activityDoneBy: role(), activityDoneAt: new Date().toISOString() }), "Activity done");
+    },
+    "close-day"() {
+      const s = scoreFor(today()), b = bandFor(s);
+      run(async () => { await saveDay(today(), { closed: true, closedAt: new Date().toISOString(), final: s, closeNotified: true }); notify("Vignesh", `Today closed at ${s} · ${b ? b.name : ""}`, b && b.fail ? "That's a fail day." : "Open Heartscore for the full report."); }, "Day closed. The report is in the calendar.");
+    },
+    reopen() { run(() => saveDay(today(), { closed: false }), "Day reopened"); },
+    month(b) { const [y, m] = S.month.split("-").map(Number); const d = new Date(y, m - 1 + Number(b.dataset.d), 1); S.month = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; loadMonth(S.month); render(); },
+    "open-day"(b) { S.sheet = b.dataset.k; render(); },
+    "close-sheet"(b, e) { if (e.target.closest("[data-stop]") && !e.target.closest("button[data-action='close-sheet']")) return; S.sheet = null; render(); },
+    "new-ch"() { S.newCh = !S.newCh; render(); },
+    "create-ch"() {
+      const title = val("ch-title").trim(), type = val("ch-type");
+      const target = type === "oneoff" ? 1 : intVal("ch-target");
+      const start = val("ch-start"), end = val("ch-end");
+      if (!title) return toast("Give the challenge a name.");
+      if (!target || target < 1) return toast("Enter how many days or times.");
+      if (!start || !end || end < start) return toast("Check the start and end dates.");
+      const doc = { title, type, who: val("ch-who"), target, minScore: intVal("ch-min") || 0, start, end, bonus: intVal("ch-bonus") || 0, reward: val("ch-reward").trim(),
+        status: isUma() ? "active" : "pending", progress: 0, rewardGiven: false, createdBy: role(), createdAt: new Date().toISOString() };
+      run(async () => { await S.db.collection("challenges").add(doc); S.newCh = false; clear("ch-title", "ch-reward"); render(); if (!isUma()) notify("Uma", "Vignesh created a challenge", `${title}${doc.reward ? " · reward: " + doc.reward : ""}. Approve it in Heartscore.`); }, isUma() ? "Challenge started" : "Sent to Uma for approval");
+    },
+    "ch-approve"(b) { const c = S.challenges.find((x) => x.id === b.dataset.id) || {}; run(async () => { await S.db.doc("challenges/" + b.dataset.id).update({ status: "active" }); notify("Vignesh", "Uma approved your challenge", c.title); }, "Challenge approved"); },
+    "ch-decline"(b) { const c = S.challenges.find((x) => x.id === b.dataset.id) || {}; run(async () => { await S.db.doc("challenges/" + b.dataset.id).update({ status: "declined" }); notify("Vignesh", "Uma declined your challenge", c.title); }, "Challenge declined"); },
+    "ch-cancel"(b) { run(() => S.db.doc("challenges/" + b.dataset.id).update({ status: "cancelled" }), "Challenge cancelled"); },
+    "ch-log"(b) { const c = S.challenges.find((x) => x.id === b.dataset.id); if (c) run(() => S.db.doc("challenges/" + c.id).update({ progress: (Number(c.progress) || 0) + 1 }), "Progress saved"); },
+    "ch-confirm"(b) {
+      const c = S.challenges.find((x) => x.id === b.dataset.id); if (!c) return;
+      run(async () => {
+        await S.db.doc("challenges/" + c.id).update({ status: "achieved", achievedOn: today() });
+        if (Number(c.bonus)) await addEntry({ date: today(), points: Number(c.bonus), reason: "Challenge bonus: " + c.title, type: "bonus", status: "approved", by: "Uma" });
+        notify("Vignesh", `Challenge achieved: ${c.title}`, `${signed(Number(c.bonus) || 0)} bonus added${c.reward ? " · reward: " + c.reward : ""}`);
+      }, "Achieved! Bonus added to today");
+    },
+    "band-add"() { readBands(); const last = S.bandDraft[S.bandDraft.length - 1]; S.bandDraft.push({ id: "b" + Date.now(), name: "New band", min: last && last.max != null ? last.max + 1 : 101, max: null, color: "#8E6BB8", fail: false, activities: [] }); render(); },
+    "band-del"(b) { readBands(); S.bandDraft.splice(Number(b.dataset.i), 1); render(); },
+    "band-save"() {
+      readBands();
+      const bs = S.bandDraft.slice().sort((a, b) => a.min - b.min);
+      for (const b of bs) if (b.max != null && b.max < b.min) return toast(`“${b.name}” ends before it starts.`);
+      run(async () => { await saveConfig({ bands: bs }); S.bandDraft = null; render(); }, "Bands saved");
+    },
+    "routine-save"() {
+      const quick = val("s-quick").split("\n").map((l) => l.trim()).filter(Boolean).map((l) => { const m = l.match(/^([+-]?\d+)\s+(.+)$/); return m ? { points: parseInt(m[1], 10), reason: m[2].trim() } : null; });
+      if (quick.some((q) => !q)) return toast("Each quick reason needs a number first, like +5 Called at lunch.");
+      const moods = val("s-moods").split(",").map((s) => s.trim()).filter(Boolean);
+      run(() => saveConfig({ reminder: val("s-rem") || DEFAULTS.reminder, close: val("s-close") || DEFAULTS.close, moods: moods.length ? moods : DEFAULTS.moods, quickReasons: quick }), "Saved");
+    },
+    "as-uma"() { S.previewUma = true; try { localStorage.setItem("hs-preview-uma", "1"); } catch (e) {} S.tab = "today"; render(); window.scrollTo(0, 0); },
+    "as-me"() { S.previewUma = false; try { localStorage.setItem("hs-preview-uma", "0"); } catch (e) {} render(); },
+    "google-in"() {
+      const p = new firebase.auth.GoogleAuthProvider(); p.setCustomParameters({ prompt: "select_account" });
+      firebase.auth().signInWithPopup(p).catch((e) => { if (e && e.code !== "auth/popup-closed-by-user" && e.code !== "auth/cancelled-popup-request") toast(e.code === "auth/popup-blocked" ? "Your browser blocked the sign-in window. Try “Use email and password”." : "Google sign-in didn't work here. Try “Use email and password”."); });
+    },
+    "email-mode"() { S.emailMode = !S.emailMode; render(); },
+    async "email-in"() {
+      const email = val("li-email").trim(), pw = val("li-pw");
+      if (!email || pw.length < 6) return toast("Enter your email and a password of at least 6 characters.");
+      try { await firebase.auth().signInWithEmailAndPassword(email, pw); }
+      catch (e) {
+        if (e && (e.code === "auth/user-not-found" || e.code === "auth/invalid-credential" || e.code === "auth/invalid-login-credentials")) {
+          try { const r = await firebase.auth().createUserWithEmailAndPassword(email, pw); await r.user.sendEmailVerification(); S.verifySent = true; render(); }
+          catch (e2) { toast(e2 && e2.code === "auth/email-already-in-use" ? "Wrong password for this email." : "Couldn't sign in: " + ((e2 && e2.message) || "")); }
+        } else toast("Couldn't sign in: " + ((e && e.message) || ""));
+      }
+    },
+    async "verified"() { const u = firebase.auth().currentUser; if (!u) return; await u.reload(); if (u.emailVerified) { await u.getIdToken(true); onUser(firebase.auth().currentUser); } else toast("Not verified yet. Tap the link in the email first."); },
+    "resend"() { const u = firebase.auth().currentUser; if (u) u.sendEmailVerification().then(() => toast("Email sent again"), () => toast("Couldn't send. Wait a minute and try again.")); },
+    "sign-out"() { firebase.auth().signOut(); },
+    "notif-on"() { enableNotifications(true); },
+    preview(b) { S.previewUma = b.checked; try { localStorage.setItem("hs-preview-uma", S.previewUma ? "1" : "0"); } catch (e) {} render(); },
+    "ch-reward"(b) { const c = S.challenges.find((x) => x.id === b.dataset.id); if (c) run(() => S.db.doc("challenges/" + c.id).update({ rewardGiven: b.checked }), b.checked ? "Marked as given" : "Marked as not given"); }
+  };
+
+  function iosNeedsInstall() {
+    const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    const standalone = window.navigator.standalone === true || matchMedia("(display-mode: standalone)").matches;
+    return ios && !standalone;
+  }
+  function notifCard() {
+    if (!S.ready || S.notif === "on" || S.notif === "unsupported-hidden") return "";
+    if (iosNeedsInstall()) return `<div class="banner"><span class="small">For notifications on iPhone, add Heartscore to your Home Screen (Share → Add to Home Screen) and open it from there.</span></div>`;
+    if (S.notif === "denied") return `<div class="banner"><span class="small">Notifications are blocked for Heartscore. Allow them in your browser's site settings to get reminders.</span></div>`;
+    if (S.notif === "unsupported") return "";
+    return `<div class="banner"><span>${isUma() ? "Get the 7:30 AM reminder and Vignesh's requests." : "Get Uma's answers and the day's final score."}</span><button class="sm primary" data-action="notif-on">Turn on notifications</button></div>`;
+  }
+
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-action]");
+    if (!b || b.disabled) return;
+    const a = b.dataset.action;
+    if (b.type === "checkbox") return; // handled on change
+    if (a === "close-sheet" && b.classList.contains("scrim") && e.target !== b) return;
+    if (A[a]) A[a](b, e);
+  });
+  document.addEventListener("change", (e) => { const b = e.target; if (b.type === "checkbox" && b.dataset.action && A[b.dataset.action]) A[b.dataset.action](b, e); });
+  document.addEventListener("input", (e) => {
+    if (e.target.id === "op-range" && $("op-num")) $("op-num").value = e.target.value;
+    if (e.target.id === "op-num" && $("op-range")) $("op-range").value = e.target.value;
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && S.sheet) { S.sheet = null; render(); } });
+
+  // re-check reminders and day changes once a minute
+  let lastDay = today();
+  setInterval(() => { if (today() !== lastDay) { lastDay = today(); S.editOpening = false; } if (S.ready && !S.sheet && !document.activeElement.matches("input,textarea,select")) render(); }, 60000);
+
+  // ---------- boot ----------
+  const CFG = window.HS_CONFIG || {};
+  const EMAILS = { uma: String((CFG.emails || {}).uma || "").toLowerCase(), vignesh: String((CFG.emails || {}).vignesh || "").toLowerCase() };
+  let unsubs = [];
+
+  function loadMonth(mk) {
+    if (!S.db || !S.cutoff || S.loadedMonths[mk] || mk + "-01" >= S.cutoff) return;
+    S.loadedMonths[mk] = true;
+    S.db.collection("entries").where("date", ">=", mk + "-01").where("date", "<=", mk + "-31").get().then((q) => {
+      q.docs.forEach((d) => (S.entriesOld[d.id] = Object.assign({ id: d.id }, d.data())));
+      mergeEntries(); render();
+    }, () => { S.loadedMonths[mk] = false; });
+  }
+
+  async function enableNotifications(ask) {
+    try {
+      if (!("Notification" in window) || !("serviceWorker" in navigator) || !(await firebase.messaging.isSupported())) { S.notif = "unsupported"; render(); return; }
+      if (Notification.permission === "denied") { S.notif = "denied"; render(); return; }
+      if (Notification.permission !== "granted") {
+        if (!ask) { S.notif = "off"; render(); return; }
+        const p = await Notification.requestPermission();
+        if (p !== "granted") { S.notif = p === "denied" ? "denied" : "off"; render(); return; }
+      }
+      const reg = await navigator.serviceWorker.register("firebase-messaging-sw.js");
+      await navigator.serviceWorker.ready;
+      const token = await firebase.messaging().getToken({ vapidKey: CFG.vapidKey, serviceWorkerRegistration: reg });
+      if (token) {
+        await S.db.doc("tokens/" + token).set({ who: role(), email: S.user.email, updatedAt: new Date().toISOString(), device: navigator.userAgent.slice(0, 120) });
+        S.notif = "on"; render();
+        if (ask) toast("Notifications are on for this phone");
+      }
+      firebase.messaging().onMessage((m) => { const n = (m && m.notification) || {}; toast([n.title, n.body].filter(Boolean).join(" · ")); });
+    } catch (e) {
+      S.notif = "off"; render();
+      if (ask) toast("Couldn't turn on notifications: " + ((e && e.message) || "unknown error"));
+    }
+  }
+
+  function startData() {
+    const db = S.db;
+    const d0 = new Date(); d0.setMonth(d0.getMonth() - 2, 1);
+    S.cutoff = keyOf(d0);
+    let got = 0; const need = 4;
+    const mark = () => { if (++got >= need) S.ready = true; render(); };
+    const once = (fn) => { let f = false; return (x) => { fn(x); if (!f) { f = true; mark(); } else render(); }; };
+    const onErr = (e) => { S.error = e && e.code === "permission-denied" ? "This account isn't allowed to open Heartscore's data." : "Couldn't load Heartscore: " + ((e && e.message) || ""); render(); };
+    unsubs.push(db.doc("config/main").onSnapshot(once((s) => { S.config = s.exists ? s.data() : null; }), onErr));
+    unsubs.push(db.collection("days").onSnapshot(once((q) => { const m = {}; q.docs.forEach((d) => (m[d.id] = d.data())); S.days = m; }), onErr));
+    unsubs.push(db.collection("entries").where("date", ">=", S.cutoff).onSnapshot(once((q) => { S.entriesLive = q.docs.map((d) => Object.assign({ id: d.id }, d.data())); mergeEntries(); }), onErr));
+    unsubs.push(db.collection("challenges").onSnapshot(once((q) => { S.challenges = q.docs.map((d) => Object.assign({ id: d.id }, d.data())); }), onErr));
+    enableNotifications(false);
+  }
+
+  function onUser(u) {
+    unsubs.forEach((f) => { try { f(); } catch (e) {} }); unsubs = [];
+    S.ready = false; S.error = null; S.user = u; S.who = null; S.verifySent = false;
+    if (!u) { S.auth = "out"; render(); return; }
+    const em = String(u.email || "").toLowerCase();
+    S.who = em && em === EMAILS.uma ? "Uma" : em && em === EMAILS.vignesh ? "Vignesh" : null;
+    if (!S.who) { S.auth = "denied"; render(); return; }
+    if (!u.emailVerified) { S.auth = "verify"; render(); return; }
+    S.auth = "in"; render();
+    startData();
+  }
+
+  render();
+  if (!window.firebase || !CFG.firebaseConfig || !CFG.firebaseConfig.apiKey) {
+    S.auth = "in"; S.error = "Heartscore isn't connected to its database yet. The config.js file is missing its Firebase settings."; render();
+  } else {
+    firebase.initializeApp(CFG.firebaseConfig);
+    const db = firebase.firestore();
+    try { db.enablePersistence({ synchronizeTabs: true }).catch(() => {}); } catch (e) {}
+    S.db = db;
+    firebase.auth().onAuthStateChanged(onUser);
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Only Uma and Vignesh, signed in with a confirmed email, can read or change anything.
+    function isCouple() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email.lower() in ['amu7792@gmail.com', 'nvignesh93@gmail.com'];
+    }
+    match /{document=**} {
+      allow read, write: if isCouple();
+    }
+  }
+}
