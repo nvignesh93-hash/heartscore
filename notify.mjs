@@ -1,7 +1,8 @@
 // Heartscore notifier. GitHub runs this every few minutes.
 // 1. Sends any queued notifications (requests, answers, day closed, challenges).
-// 2. Sends Uma the morning reminder if today's opening score isn't set by the reminder time.
-// 3. Closes yesterday if nobody did, and tells Vignesh the final score.
+// 2. Sends the wife the morning reminder if today's opening score isn't set by the reminder time.
+// 3. Closes the day at the close time (and any earlier day left open), and tells the husband the final score.
+// Names, times and which notifications are on all come from the app's Settings (config/main).
 import admin from "firebase-admin";
 
 const TZ = "Asia/Kolkata";
@@ -78,6 +79,8 @@ async function main() {
   const cfgSnap = await db.doc("config/main").get();
   const cfg = cfgSnap.exists ? cfgSnap.data() : {};
   const bands = Array.isArray(cfg.bands) && cfg.bands.length ? cfg.bands : DEFAULT_BANDS;
+  const names = Object.assign({ wife: "Wife", husband: "Husband" }, cfg.names || {});
+  const on = (k) => !cfg.notify || cfg.notify[k] !== false;
 
   // 1. Queued notifications
   const out = await db.collection("outbox").where("sent", "==", false).limit(50).get();
@@ -88,34 +91,41 @@ async function main() {
   }
   console.log(`Outbox: ${out.size} sent`);
 
-  // 2. Morning reminder for Uma (window: reminder time to 3 hours after)
+  if (!cfgSnap.exists) { console.log("Heartscore isn't set up yet"); return; }
+
+  // 2. Morning reminder for the wife (window: reminder time to 3 hours after)
   const rem = toMins(cfg.reminder || "07:30");
-  if (mins >= rem && mins < rem + 180) {
+  if (on("morning") && mins >= rem && mins < rem + 180) {
     const ref = db.doc("days/" + date);
     const snap = await ref.get();
     const d = snap.exists ? snap.data() : {};
     if (typeof d.opening !== "number" && !d.reminderSent) {
-      await send("Uma", "Good morning, Uma", "Time to set today's opening score for Vignesh.");
+      await send("wife", `Good morning, ${names.wife}`, `Time to set today's opening score for ${names.husband}.`);
       await ref.set({ date, reminderSent: true }, { merge: true });
       console.log("Morning reminder sent");
     }
   }
 
-  // 3. Close yesterday if it was left open, and tell Vignesh
-  const y = addDays(date, -1);
-  const yRef = db.doc("days/" + y);
-  const ySnap = await yRef.get();
-  if (ySnap.exists) {
-    const yd = ySnap.data();
-    if (!yd.closeNotified) {
-      const r = await scoreFor(y, yd, bands);
-      if (r) {
-        await send("Vignesh", `Yesterday closed at ${r.score} · ${r.band.name}`, r.band.fail ? "That was a fail day." : "Open Heartscore for the full report.");
-        await yRef.set({ closed: true, final: r.score, closeNotified: true, closedAt: new Date().toISOString() }, { merge: true });
-        console.log("Yesterday auto-closed");
-      } else {
-        await yRef.set({ closeNotified: true }, { merge: true });
+  // 3. Close today at the close time, and catch up on yesterday if it was left open
+  const closeAt = toMins(cfg.close || "22:00");
+  const toClose = [addDays(date, -1)];
+  if (mins >= closeAt) toClose.push(date);
+  for (const k of toClose) {
+    const ref = db.doc("days/" + k);
+    const snap = await ref.get();
+    if (!snap.exists) continue;
+    const d = snap.data();
+    if (d.closeNotified) continue;
+    const r = await scoreFor(k, d, bands);
+    if (r) {
+      if (on("dayClosed")) {
+        const when = k === date ? "Today" : "Yesterday";
+        await send("husband", `${when} closed at ${r.score} · ${r.band.name}`, r.band.fail ? "That was a fail day." : "Open Heartscore for the full report.");
       }
+      await ref.set({ closed: true, final: r.score, closeNotified: true, closedAt: new Date().toISOString() }, { merge: true });
+      console.log(`Closed ${k} at ${r.score}`);
+    } else if (k !== date) {
+      await ref.set({ closeNotified: true }, { merge: true });
     }
   }
 }

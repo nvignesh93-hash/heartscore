@@ -175,10 +175,10 @@ input[type="checkbox"] { width: auto; accent-color: var(--accent); }
   // App defaults, used until the shared settings are saved
   const DEFAULTS = {
     bands: [
-      { id: "red", name: "Fail", min: 0, max: 40, color: "#D64545", fail: true, activities: [{ title: "Vignesh plans a dinner or outing of Uma's choice", by: "Vignesh" }] },
+      { id: "red", name: "Fail", min: 0, max: 40, color: "#D64545", fail: true, activities: [{ title: "{{H}} plans a dinner or outing of {{W}}'s choice", by: "husband" }] },
       { id: "orange", name: "Needs work", min: 41, max: 60, color: "#E8833A", fail: false, activities: [{ title: "30-minute walk together, phones away", by: "Either" }] },
-      { id: "yellow", name: "Good", min: 61, max: 80, color: "#E0B03A", fail: false, activities: [{ title: "Vignesh makes morning tea or breakfast", by: "Vignesh" }] },
-      { id: "green", name: "Great", min: 81, max: null, color: "#3E9E63", fail: false, activities: [{ title: "Uma picks a treat for Vignesh", by: "Uma" }] }
+      { id: "yellow", name: "Good", min: 61, max: 80, color: "#E0B03A", fail: false, activities: [{ title: "{{H}} makes morning tea or breakfast", by: "husband" }] },
+      { id: "green", name: "Great", min: 81, max: null, color: "#3E9E63", fail: false, activities: [{ title: "{{W}} picks a treat for {{H}}", by: "wife" }] }
     ],
     quickReasons: [
       { points: 5, reason: "Called at lunch" }, { points: 10, reason: "Helped at home" },
@@ -229,8 +229,22 @@ input[type="checkbox"] { width: auto; accent-color: var(--accent); }
       close: c.close || DEFAULTS.close
     };
   };
-  const role = () => S.who || "Uma";
-  const isUma = () => role() === "Uma";
+  const role = () => S.who || "wife";
+  function names() {
+    const n = (S.config && S.config.names) || {}, d = (window.HS_CONFIG && HS_CONFIG.names) || {};
+    return { wife: n.wife || d.wife || "Wife", husband: n.husband || d.husband || "Husband" };
+  }
+  function personName(k) {
+    const n = names();
+    if (k === "wife") return n.wife;
+    if (k === "husband") return n.husband;
+    if (k === "Both" || k === "both") return "both of you";
+    return "either of you";
+  }
+  const TT = (str) => String(str == null ? "" : str).replace(/\{\{W\}\}/g, names().wife).replace(/\{\{H\}\}/g, names().husband);
+  const TH = (str) => String(str == null ? "" : str).replace(/\{\{W\}\}/g, esc(names().wife)).replace(/\{\{H\}\}/g, esc(names().husband));
+  function notifyOn(kind) { const n = (S.config && S.config.notify) || {}; return n[kind] !== false; }
+  const isUma = () => role() === "wife";
 
   // ---------- scoring ----------
   const bands = () => cfg().bands.slice().sort((a, b) => a.min - b.min);
@@ -301,14 +315,15 @@ input[type="checkbox"] { width: auto; accent-color: var(--accent); }
     if (S.days[k]) await ref.update(patch); else await ref.set(Object.assign({ date: k }, patch));
   }
   function addEntry(e) { return S.db.collection("entries").add(Object.assign({ at: new Date().toISOString() }, e)); }
-  function notify(to, title, body) {
-    return S.db.collection("outbox").add({ to, title, body: body || "", sent: false, createdAt: new Date().toISOString() }).catch(() => {});
+  function notify(to, title, body, kind) {
+    if (kind && !notifyOn(kind)) return Promise.resolve();
+    return S.db.collection("outbox").add({ to, title: TT(title), body: TT(body || ""), sent: false, createdAt: new Date().toISOString() }).catch(() => {});
   }
   function mergeEntries() {
     const live = S.entriesLive, ids = new Set(live.map((e) => e.id));
     S.entries = live.concat(Object.values(S.entriesOld).filter((e) => !ids.has(e.id)));
   }
-  async function saveConfig(patch) { await S.db.doc("config/main").set(Object.assign({}, cfg(), patch)); }
+  async function saveConfig(patch) { await S.db.doc("config/main").set(Object.assign({}, S.config || {}, cfg(), patch)); }
 
   async function run(fn, okMsg) {
     if (!S.db) return toast("Sign in to make changes.");
@@ -322,7 +337,7 @@ input[type="checkbox"] { width: auto; accent-color: var(--accent); }
   }
 
   let toastT;
-  function toast(msg) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => (t.hidden = true), 3200); }
+  function toast(msg) { const t = $("toast"); t.textContent = TT(msg); t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => (t.hidden = true), 3200); }
 
   // ---------- icons ----------
   const I = {
@@ -351,15 +366,15 @@ input[type="checkbox"] { width: auto; accent-color: var(--accent); }
   function entryRow(e, opts) {
     const p = Number(e.points) || 0;
     const tags = [];
-    if (e.type === "request") tags.push(`<span class="tag accent">Requested by Vignesh</span>`);
+    if (e.type === "request") tags.push(`<span class="tag accent">Requested by {{H}}</span>`);
     if (e.type === "bonus") tags.push(`<span class="tag accent">Challenge bonus</span>`);
-    if (e.status === "pending") tags.push(`<span class="tag">Waiting for Uma</span>`);
+    if (e.status === "pending") tags.push(`<span class="tag">Waiting for {{W}}</span>`);
     if (e.status === "declined") tags.push(`<span class="tag">Declined</span>`);
     return `<div class="entry ${e.status !== "approved" ? "dim" : ""}">
       <span class="t">${opts && opts.date ? esc(fmtShort(e.date)) : esc(fmtTime(e.at))}</span>
       <div style="min-width:0"><div>${esc(e.reason || "No reason given")}</div>
         ${tags.length ? `<div class="row" style="gap:6px;margin-top:4px">${tags.join("")}</div>` : ""}
-        ${e.reply ? `<div class="small muted" style="margin-top:4px">Uma: ${esc(e.reply)}</div>` : ""}</div>
+        ${e.reply ? `<div class="small muted" style="margin-top:4px">{{W}}: ${esc(e.reply)}</div>` : ""}</div>
       <span class="pts ${p >= 0 ? "up" : "down"}">${signed(p)}</span></div>`;
   }
 
@@ -370,11 +385,12 @@ input[type="checkbox"] { width: auto; accent-color: var(--accent); }
     if (!a.act) return `<section class="card"><div class="eyebrow">Today's activity</div><p class="muted">Yesterday closed ${esc(a.band.name)}, which has no activity yet. Add one in Settings.</p></section>`;
     return `<section class="card"><div class="row between"><div class="eyebrow">Today's activity</div>${bandChip(a.band)}</div>
       <h3 style="font-size:17px">${esc(a.act.title)}</h3>
-      <div class="row between"><span class="muted small">Done by ${esc(a.act.by === "Either" ? "either of you" : a.act.by)} · because yesterday closed ${esc(a.band.name)}</span>
-      ${d.activityDone ? `<span class="pass">Done${d.activityDoneBy ? " by " + esc(d.activityDoneBy) : ""}</span>` : `<button class="sm" data-action="activity-done" data-k="${k}">Mark done</button>`}</div></section>`;
+      <div class="row between"><span class="muted small">Done by ${esc(personName(a.act.by))} · because yesterday closed ${esc(a.band.name)}</span>
+      ${d.activityDone ? `<span class="pass">Done${d.activityDoneBy ? " by " + esc(personName(d.activityDoneBy)) : ""}</span>` : `<button class="sm" data-action="activity-done" data-k="${k}">Mark done</button>`}</div></section>`;
   }
 
   function viewToday() {
+    if (!S.config) return setupFields(true);
     const k = today(), c = cfg(), d = S.days[k] || {};
     const score = scoreFor(k), b = bandFor(score);
     const ys = scoreFor(addDays(k, -1)), yb = bandFor(ys);
@@ -384,16 +400,16 @@ input[type="checkbox"] { width: auto; accent-color: var(--accent); }
     let h = notifCard();
 
     if (isUma() && !hasOpen && nowMins() >= toMins(c.reminder)) {
-      h += `<div class="banner"><span><b>Good morning, Uma.</b> Time to set today's score for Vignesh.</span></div>`;
+      h += `<div class="banner"><span><b>Good morning, {{W}}.</b> Time to set today's score for {{H}}.</span></div>`;
     }
     if (isUma() && (pendingReq.length || pendingCh.length)) {
       const n = pendingReq.length + pendingCh.length;
-      h += `<div class="banner"><span>Vignesh has ${n} ${n === 1 ? "thing" : "things"} waiting for your answer.</span><button class="sm" data-action="tab" data-v="requests">Review</button></div>`;
+      h += `<div class="banner"><span>{{H}} has ${n} ${n === 1 ? "thing" : "things"} waiting for your answer.</span><button class="sm" data-action="tab" data-v="requests">Review</button></div>`;
     }
 
     h += `<section class="card"><div class="hero">${ring(score)}<div style="display:flex;flex-direction:column;gap:8px;min-width:0">
       <div class="eyebrow">${esc(fmtDay(k, true))}</div>
-      <h2>${score == null ? (isUma() ? "Start the day" : "Waiting for Uma") : esc(b.name)}</h2>
+      <h2>${score == null ? (isUma() ? "Start the day" : "Waiting for {{W}}") : esc(b.name)}</h2>
       <div class="row">${bandChip(b)}${passTag(b)}${d.closed ? '<span class="tag">Day closed</span>' : ""}</div>
       ${hasOpen ? `<p class="small muted">Opened at ${d.opening}${d.yesterdayFeel ? " · yesterday " + esc(d.yesterdayFeel.toLowerCase()) : ""}${d.mood ? " · " + esc(d.mood) : ""}</p>` : ""}
       ${ys != null ? `<p class="small muted">Yesterday closed at <span class="num">${ys}</span> (${esc(yb.name)})</p>` : ""}
@@ -403,7 +419,7 @@ input[type="checkbox"] { width: auto; accent-color: var(--accent); }
       if (!hasOpen || S.editOpening) {
         const mood = S.draftMood !== undefined ? S.draftMood : d.mood || null;
         const yf = S.draftYest !== undefined ? S.draftYest : d.yesterdayFeel || null;
-        h += `<section class="card"><div class="row between"><h3>${hasOpen ? "Change today's opening score" : "Today's opening score for Vignesh"}</h3>${hasOpen ? '<button class="ghost sm" data-action="cancel-opening">Cancel</button>' : ""}</div>
+        h += `<section class="card"><div class="row between"><h3>${hasOpen ? "Change today's opening score" : "Today's opening score for {{H}}"}</h3>${hasOpen ? '<button class="ghost sm" data-action="cancel-opening">Cancel</button>' : ""}</div>
           <p class="small muted">Every day starts fresh. You decide the opening score from how yesterday ended and your mindset this morning. Nothing is carried over.</p>
           <div><div class="eyebrow" style="margin-bottom:6px">1 · How did yesterday end?</div>
             <div class="row" style="gap:6px">${["Ended well", "Okay", "Ended badly"].map((m) => `<button class="chip" data-action="yest" data-v="${m}" aria-pressed="${yf === m}">${m}</button>`).join("")}</div>
@@ -423,10 +439,10 @@ input[type="checkbox"] { width: auto; accent-color: var(--accent); }
         <div class="row"><button class="grow" data-action="adj" data-sign="-1" style="color:var(--bad)">− Take away</button><button class="grow primary" data-action="adj" data-sign="1">+ Add</button></div></section>`;
     } else {
       h += hasOpen
-        ? `<section class="card"><div class="eyebrow">Today's opening score</div><div class="row between"><span>Uma started today at <b class="num">${d.opening}</b></span>${bandChip(bandFor(d.opening))}</div>
+        ? `<section class="card"><div class="eyebrow">Today's opening score</div><div class="row between"><span>{{W}} started today at <b class="num">${d.opening}</b></span>${bandChip(bandFor(d.opening))}</div>
             <p class="small muted">${[d.yesterdayFeel ? "Yesterday: " + esc(d.yesterdayFeel) : "", d.mood ? "Her mindset: " + esc(d.mood) : ""].filter(Boolean).join(" · ") || "No mood noted"}${d.note ? " · “" + esc(d.note) + "”" : ""}</p></section>`
-        : `<section class="card"><div class="eyebrow">Today's opening score</div><p>Not set yet. Each morning Uma types a fresh opening score on her phone, based on how yesterday ended and her mindset today.</p>${S.isOwner ? '<button class="primary" data-action="as-uma">Switch to Uma\'s view to enter it</button>' : ""}</section>`;
-      h += `<section class="card"><h3>Ask Uma for points</h3><p class="small muted">Uma gets your request and can approve it, decline it or change the amount.</p>
+        : `<section class="card"><div class="eyebrow">Today's opening score</div><p>Not set yet. Each morning {{W}} types a fresh opening score on her phone, based on how yesterday ended and her mindset today.</p>${S.isOwner ? '<button class="primary" data-action="as-uma">Switch to {{W}}\'s view to enter it</button>' : ""}</section>`;
+      h += `<section class="card"><h3>Ask {{W}} for points</h3><p class="small muted">{{W}} gets your request and can approve it, decline it or change the amount.</p>
         <div class="fields" style="grid-template-columns:96px 1fr"><label for="rq-amt">Points<input id="rq-amt" type="number" inputmode="numeric" placeholder="10"></label>
         <label for="rq-reason">Reason<input id="rq-reason" type="text" maxlength="140" placeholder="e.g. Fixed the leaking tap"></label></div>
         <button class="primary" data-action="request">Send request</button></section>`;
@@ -442,7 +458,7 @@ input[type="checkbox"] { width: auto; accent-color: var(--accent); }
     if (isUma()) {
       h += d.closed
         ? `<section class="card"><div class="row between"><span>Today is closed at <b class="num">${score == null ? "–" : score}</b>.</span><button class="sm" data-action="reopen">Reopen</button></div></section>`
-        : `<section class="card"><div class="row between"><span class="small muted">The day closes on its own at midnight. Close it now to send the report.</span><button class="sm" data-action="close-day" ${score == null ? "disabled" : ""}>Close today</button></div></section>`;
+        : `<section class="card"><div class="row between"><span class="small muted">The day closes on its own at ${fmt12(c.close)}. Close it now to send the report.</span><button class="sm" data-action="close-day" ${score == null ? "disabled" : ""}>Close today</button></div></section>`;
     }
     return h;
   }
@@ -478,7 +494,7 @@ input[type="checkbox"] { width: auto; accent-color: var(--accent); }
     const st = chStatus(c), p = chProgress(c);
     const pct = Math.round((p.value / p.target) * 100);
     const typeLabel = c.type === "streak" ? `Streak · ${p.target} days in a row at ${c.minScore}+` : c.type === "count" ? `Count · ${p.target} times` : "One-off";
-    const statusLabel = { pending: "Waiting for Uma's approval", active: "Active", awaiting: "Done · waiting for Uma to confirm", achieved: "Achieved", failed: "Not achieved", declined: "Declined", cancelled: "Cancelled" }[st] || st;
+    const statusLabel = { pending: "Waiting for {{W}}'s approval", active: "Active", awaiting: "Done · waiting for {{W}} to confirm", achieved: "Achieved", failed: "Not achieved", declined: "Declined", cancelled: "Cancelled" }[st] || st;
     let actions = "";
     if (st === "pending" && isUma()) actions = `<button class="sm" data-action="ch-decline" data-id="${c.id}">Decline</button><button class="sm primary" data-action="ch-approve" data-id="${c.id}">Approve</button>`;
     else if (st === "active" && c.type === "count") actions = `<button class="sm" data-action="ch-log" data-id="${c.id}">+1 done</button>`;
@@ -486,7 +502,7 @@ input[type="checkbox"] { width: auto; accent-color: var(--accent); }
     if (st === "awaiting" && isUma()) actions = `<button class="sm primary" data-action="ch-confirm" data-id="${c.id}">Confirm and add ${signed(Number(c.bonus) || 0)}</button>`;
     if (st === "achieved") actions = `<label class="row" style="flex-direction:row;gap:8px;color:var(--ink)"><input type="checkbox" id="rg-${c.id}" data-action="ch-reward" data-id="${c.id}" ${c.rewardGiven ? "checked" : ""}> Reward given</label>`;
     const cancel = (st === "active" || st === "pending") && (isUma() || c.createdBy === role()) ? `<button class="ghost sm danger" data-action="ch-cancel" data-id="${c.id}">Cancel</button>` : "";
-    return `<article class="card"><div class="ch-head"><div style="min-width:0"><h3 style="font-size:16px">${esc(c.title)}</h3><p class="small muted">${esc(typeLabel)} · for ${esc(c.who === "Both" ? "both of you" : c.who)}</p></div><span class="tag ${st === "achieved" || st === "awaiting" ? "accent" : ""}">${esc(statusLabel)}</span></div>
+    return `<article class="card"><div class="ch-head"><div style="min-width:0"><h3 style="font-size:16px">${esc(c.title)}</h3><p class="small muted">${esc(typeLabel)} · for ${esc(personName(c.who))}</p></div><span class="tag ${st === "achieved" || st === "awaiting" ? "accent" : ""}">${esc(statusLabel)}</span></div>
       ${st !== "declined" && st !== "cancelled" ? `<div><div class="bar"><i style="width:${pct}%"></i></div><div class="row between small muted" style="margin-top:4px"><span class="num">${p.value} of ${p.target}</span><span>${esc(fmtShort(c.start))} to ${esc(fmtShort(c.end))}</span></div></div>` : ""}
       <div class="reward"><span class="pts up num" style="font-family:var(--display);font-weight:600">${signed(Number(c.bonus) || 0)}</span><span class="muted">bonus</span>${c.reward ? `<span>· ${esc(c.reward)}</span>` : ""}</div>
       ${actions || cancel ? `<div class="row between">${cancel || "<span></span>"}<div class="row">${actions}</div></div>` : ""}</article>`;
@@ -499,15 +515,15 @@ input[type="checkbox"] { width: auto; accent-color: var(--accent); }
     const t = today();
     let h = `<div class="row between"><h1>Challenges</h1><button class="${S.newCh ? "" : "primary"} sm" data-action="new-ch">${S.newCh ? "Close" : "New challenge"}</button></div>`;
     if (S.newCh) {
-      h += `<section class="card"><h3>New challenge</h3>${!isUma() ? '<p class="small muted">Uma approves it before it starts.</p>' : ""}
+      h += `<section class="card"><h3>New challenge</h3>${!isUma() ? '<p class="small muted">{{W}} approves it before it starts.</p>' : ""}
         <label for="ch-title">Name<input id="ch-title" type="text" maxlength="80" placeholder="e.g. 7 green days in a row"></label>
         <div class="fields"><label for="ch-type">Type<select id="ch-type"><option value="streak">Streak of scores</option><option value="count">Do it a number of times</option><option value="oneoff">One-off task</option></select></label>
-        <label for="ch-who">Who does it<select id="ch-who"><option>Vignesh</option><option>Uma</option><option>Both</option></select></label></div>
+        <label for="ch-who">Who does it<select id="ch-who"><option value="husband">{{H}}</option><option value="wife">{{W}}</option><option value="Both">Both</option></select></label></div>
         <div class="fields"><label for="ch-target">Days / times<input id="ch-target" type="number" min="1" value="7"></label>
         <label for="ch-min">Score each day (streaks)<input id="ch-min" type="number" min="0" value="81"></label></div>
         <div class="fields"><label for="ch-start">Starts<input id="ch-start" type="date" value="${t}"></label><label for="ch-end">Ends<input id="ch-end" type="date" value="${addDays(t, 13)}"></label></div>
         <div class="fields" style="grid-template-columns:110px 1fr"><label for="ch-bonus">Bonus points<input id="ch-bonus" type="number" min="0" value="15"></label><label for="ch-reward">Reward if achieved<input id="ch-reward" type="text" maxlength="120" placeholder="e.g. Weekend trip"></label></div>
-        <button class="primary" data-action="create-ch">${isUma() ? "Start challenge" : "Send to Uma for approval"}</button></section>`;
+        <button class="primary" data-action="create-ch">${isUma() ? "Start challenge" : "Send to {{W}} for approval"}</button></section>`;
     }
     h += open.length ? open.map(challengeCard).join("") : `<section class="card"><p class="muted">No active challenges. Create one: a streak like “7 green days in a row”, something to do a number of times, or a one-off surprise. Each carries bonus points and a reward.</p></section>`;
     if (past.length) h += `<h2 style="margin-top:8px">Past challenges</h2>` + past.map(challengeCard).join("");
@@ -520,15 +536,15 @@ input[type="checkbox"] { width: auto; accent-color: var(--accent); }
     const chPend = S.challenges.filter((c) => c.status === "pending" || chStatus(c) === "awaiting");
     let h = `<h1>Requests</h1>`;
     if (isUma()) {
-      h += `<p class="muted">Point requests and challenges from Vignesh waiting for your answer.</p>`;
-      if (!pend.length && !chPend.length) h += `<section class="card"><p class="muted">Nothing waiting. When Vignesh asks for points or creates a challenge, it shows up here.</p></section>`;
+      h += `<p class="muted">Point requests and challenges from {{H}} waiting for your answer.</p>`;
+      if (!pend.length && !chPend.length) h += `<section class="card"><p class="muted">Nothing waiting. When {{H}} asks for points or creates a challenge, it shows up here.</p></section>`;
       h += pend.map((e) => `<section class="card"><div class="row between"><span class="small muted">${esc(fmtDay(e.date))} · ${esc(fmtTime(e.at))}</span><span class="pts ${e.points >= 0 ? "up" : "down"}" style="font-family:var(--display);font-weight:600">${signed(Number(e.points) || 0)}</span></div>
         <p>${esc(e.reason || "No reason given")}</p>
         <div class="fields" style="grid-template-columns:96px 1fr"><label for="ra-${e.id}">Give<input id="ra-${e.id}" type="number" value="${Number(e.points) || 0}"></label><label for="rr-${e.id}">Reply (optional)<input id="rr-${e.id}" type="text" maxlength="140"></label></div>
         <div class="row" style="justify-content:flex-end"><button class="sm" data-action="req-decline" data-id="${e.id}">Decline</button><button class="sm primary" data-action="req-approve" data-id="${e.id}">Approve</button></div></section>`).join("");
       h += chPend.map(challengeCard).join("");
     } else {
-      h += `<p class="muted">Your point requests and what Uma decided.</p>`;
+      h += `<p class="muted">Your point requests and what {{W}} decided.</p>`;
       h += reqs.length ? `<section class="card"><div class="list">${reqs.slice(0, 60).map((e) => entryRow(e, { date: true })).join("")}</div></section>` : `<section class="card"><p class="muted">No requests yet. Ask for points from the Today tab.</p></section>`;
     }
     const hist = reqs.filter((e) => e.status !== "pending");
@@ -539,23 +555,23 @@ input[type="checkbox"] { width: auto; accent-color: var(--accent); }
   function viewSettings() {
     const c = cfg();
     if (!S.bandDraft) S.bandDraft = JSON.parse(JSON.stringify(bands()));
-    let h = `<h1>Settings</h1>`;
-    h += `<section class="card"><h3>Score bands</h3><p class="small muted">The final score picks the band, its colour on the calendar and the next day's activity. Leave “To” empty for no upper limit. Activities: one per line as <span class="num">Activity | Vignesh, Uma or Either</span>.</p>
+    let h = `<h1>Settings</h1>` + setupFields(false);
+    h += `<section class="card"><h3>Score bands</h3><p class="small muted">The final score picks the band, its colour on the calendar and the next day's activity. Leave “To” empty for no upper limit. Activities: one per line as <span class="num">Activity | {{H}}, {{W}} or Either</span>.</p>
       ${S.bandDraft.map((b, i) => `<div class="bandrow"><div class="fields" style="grid-template-columns:1fr 70px 70px 56px"><label for="b-name-${i}">Name<input id="b-name-${i}" type="text" value="${esc(b.name)}"></label><label for="b-min-${i}">From<input id="b-min-${i}" type="number" value="${b.min}"></label><label for="b-max-${i}">To<input id="b-max-${i}" type="number" value="${b.max == null ? "" : b.max}"></label><label for="b-col-${i}">Colour<input id="b-col-${i}" type="color" value="${esc(b.color)}"></label></div>
         <label class="row" style="flex-direction:row;gap:8px;color:var(--ink)"><input type="checkbox" id="b-fail-${i}" ${b.fail ? "checked" : ""}> Counts as a fail</label>
-        <label for="b-act-${i}">Activities<textarea id="b-act-${i}" rows="2">${esc((b.activities || []).map((a) => a.title + " | " + a.by).join("\n"))}</textarea></label>
+        <label for="b-act-${i}">Activities<textarea id="b-act-${i}" rows="2">${esc((b.activities || []).map((a) => a.title + " | " + (a.by === "husband" || a.by === "wife" ? personName(a.by) : "Either")).join("\n"))}</textarea></label>
         <div class="row" style="justify-content:flex-end"><button class="ghost sm danger" data-action="band-del" data-i="${i}" ${S.bandDraft.length <= 1 ? "disabled" : ""}>Remove band</button></div></div>`).join("")}
       <div class="row between"><button class="sm" data-action="band-add">Add band</button><button class="primary" data-action="band-save">Save bands</button></div></section>`;
-    h += `<section class="card"><h3>Daily routine</h3><div class="fields"><label for="s-rem">Morning reminder<input id="s-rem" type="time" value="${esc(c.reminder)}"></label><label for="s-close">Day close<input id="s-close" type="time" value="${esc(c.close)}"></label></div>
+    h += `<section class="card"><h3>Moods and quick reasons</h3>
       <label for="s-moods">Mood choices (comma separated)<input id="s-moods" type="text" value="${esc(c.moods.join(", "))}"></label>
       <label for="s-quick">Quick reasons, one per line as <span class="num">+5 Called at lunch</span><textarea id="s-quick" rows="4">${esc(c.quickReasons.map((q) => signed(q.points) + " " + q.reason).join("\n"))}</textarea></label>
       <button class="primary" data-action="routine-save">Save</button>
-      <p class="small muted">Uma gets a notification at the reminder time if today's opening score isn't set yet. It can arrive up to about 15 minutes late.</p></section>`;
+      </section>`;
     if (S.isOwner) {
-      h += `<section class="card"><h3>Preview</h3><p class="small muted">See and test the app the way Uma sees it. Anything you do in preview is saved as Uma's.</p>
-        <label class="row" style="flex-direction:row;gap:8px;color:var(--ink)"><input type="checkbox" id="s-preview" data-action="preview" ${S.previewUma ? "checked" : ""}> Use Heartscore as Uma on this device</label></section>`;
+      h += `<section class="card"><h3>Preview</h3><p class="small muted">See and test the app the way {{W}} sees it. Anything you do in preview is saved as {{W}}'s.</p>
+        <label class="row" style="flex-direction:row;gap:8px;color:var(--ink)"><input type="checkbox" id="s-preview" data-action="preview" ${S.previewUma ? "checked" : ""}> Use Heartscore as {{W}} on this device</label></section>`;
     }
-    h += `<section class="card"><h3>Account</h3><p class="small muted">Signed in as ${esc(S.user && S.user.email)} (${esc(role())}).</p>
+    h += `<section class="card"><h3>Account</h3><p class="small muted">Signed in as ${esc(S.user && S.user.email)} (${esc(personName(role()))}).</p>
       <p class="small muted">Notifications on this phone: ${S.notif === "on" ? "on" : S.notif === "denied" ? "blocked in browser settings" : iosNeedsInstall() ? "open from the Home Screen icon to turn on" : "off"}</p>
       <div class="row">${S.notif !== "on" && !iosNeedsInstall() && S.notif !== "denied" && S.notif !== "unsupported" ? '<button class="sm" data-action="notif-on">Turn on notifications</button>' : ""}<button class="sm" data-action="sign-out">Sign out</button></div></section>`;
     return h;
@@ -572,13 +588,30 @@ input[type="checkbox"] { width: auto; accent-color: var(--accent); }
         ${d.note ? `<p class="small muted">“${esc(d.note)}”</p>` : ""}
         <p class="small muted">${isClosed(k) ? "Final score" : "Running score, day still open"}</p></div></div></section>
       <section class="card"><h3>Changes during the day</h3><div class="list">${ents.map((e) => entryRow(e)).join("") || '<p class="empty">No changes.</p>'}</div></section>
-      <section class="card"><h3>Activity</h3>${act && act.act ? `<p>${esc(act.act.title)} <span class="muted small">· ${esc(act.act.by)}</span></p><p class="${d.activityDone ? "pass" : "muted small"}">${d.activityDone ? "Done" : "Not marked done"}</p>` : '<p class="muted small">No activity that day.</p>'}
+      <section class="card"><h3>Activity</h3>${act && act.act ? `<p>${esc(act.act.title)} <span class="muted small">· ${esc(personName(act.act.by))}</span></p><p class="${d.activityDone ? "pass" : "muted small"}">${d.activityDone ? "Done" : "Not marked done"}</p>` : '<p class="muted small">No activity that day.</p>'}
       ${b && b.activities && b.activities.length ? `<p class="small muted">Next day's activity from ${esc(b.name)}: ${esc(b.activities[((dayIndex(addDays(k, 1)) % b.activities.length) + b.activities.length) % b.activities.length].title)}</p>` : ""}</section>
     </div></div>`;
   }
 
+  function setupFields(first) {
+    const c = cfg(), n = names(), nt = (S.config && S.config.notify) || {};
+    const box = (k, label, sub) => `<label class="row" style="flex-direction:row;flex-wrap:nowrap;gap:10px;align-items:flex-start;color:var(--ink)"><input type="checkbox" id="s-n-${k}" ${nt[k] !== false ? "checked" : ""} style="margin-top:3px;flex:none"><span style="min-width:0">${label}<br><span class="small muted">${sub}</span></span></label>`;
+    return `<section class="card"><h3>${first ? "Set up Heartscore" : "Names, times and notifications"}</h3>
+      ${first ? '<p class="small muted">A few details before you start. You can change all of these later in Settings.</p>' : ""}
+      <div class="fields"><label for="s-wname">Wife's name (gives the score)<input id="s-wname" type="text" maxlength="30" value="${esc(n.wife)}"></label><label for="s-hname">Husband's name (gets the score)<input id="s-hname" type="text" maxlength="30" value="${esc(n.husband)}"></label></div>
+      <div class="fields"><label for="s-rem">Morning reminder time<input id="s-rem" type="time" value="${esc(c.reminder)}"></label><label for="s-close">Day closes at<input id="s-close" type="time" value="${esc(c.close)}"></label></div>
+      <p class="small muted">If the opening score isn't set by the reminder time, {{W}} gets a reminder. At the close time, the day closes on its own with whatever score it has.</p>
+      <div class="eyebrow">Send these notifications</div>
+      ${box("morning", "Morning reminder to {{W}}", "Only if today's opening score isn't set yet")}
+      ${box("requests", "{{H}}'s requests to {{W}}", "Point requests and new challenges")}
+      ${box("answers", "{{W}}'s answers to {{H}}", "Approved or declined requests, challenges, bonuses")}
+      ${box("dayClosed", "Day's final score to {{H}}", "When the day closes")}
+      <p class="small muted">Notifications can arrive a few minutes late. Each phone also has to turn them on once.</p>
+      <button class="primary" data-action="setup-save">${first ? "Save and start" : "Save"}</button></section>`;
+  }
+
   function viewSignIn() {
-    return `<section class="card" style="gap:16px"><h2>Welcome to Heartscore</h2><p class="muted">Sign in with the Google account Vignesh set up for you. You only do this once on each phone.</p>
+    return `<section class="card" style="gap:16px"><h2>Welcome to Heartscore</h2><p class="muted">Sign in with the Google account {{H}} set up for you. You only do this once on each phone.</p>
       <button class="primary" data-action="google-in">Continue with Google</button>
       <button class="ghost" data-action="email-mode">${S.emailMode ? "Hide email sign-in" : "Use email and password instead"}</button>
       ${S.emailMode ? `<div style="display:flex;flex-direction:column;gap:10px"><label for="li-email">Email<input id="li-email" type="email" autocomplete="email"></label><label for="li-pw">Password (6+ characters)<input id="li-pw" type="password" autocomplete="current-password"></label><button data-action="email-in">Sign in</button><p class="small muted">First time? This creates your account and sends a link to confirm your email.</p></div>` : ""}</section>`;
@@ -594,14 +627,14 @@ input[type="checkbox"] { width: auto; accent-color: var(--accent); }
 
     const t = role();
     let body = `<header class="topbar"><div class="brand"><svg width="30" height="30" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-8-5-8-11.2A4.6 4.6 0 0 1 12 7a4.6 4.6 0 0 1 8 2.8C20 16 12 21 12 21z" fill="var(--accent)"/></svg><h1 style="font-size:20px">Heartscore</h1></div>
-      ${S.ready ? (t === "Uma" && S.isOwner ? `<button class="who" data-action="as-me" style="border:0;cursor:pointer">Viewing as Uma · switch back</button>` : `<span class="who">${t}</span>`) : ""}</header>`;
+      ${S.ready ? (t === "wife" && S.isOwner ? `<button class="who" data-action="as-me" style="border:0;cursor:pointer">Viewing as {{W}} · switch back</button>` : `<span class="who">${esc(personName(t))}</span>`) : ""}</header>`;
     if (S.auth === "out") body += viewSignIn();
     else if (S.auth === "verify") body += `<section class="card"><h2>Check your email</h2><p class="muted">We sent a link to ${esc(S.user && S.user.email)}. Tap it, then come back here.</p><button class="primary" data-action="verified">I've tapped the link</button><div class="row"><button class="sm" data-action="resend">Send again</button><button class="sm" data-action="sign-out">Use another account</button></div></section>`;
-    else if (S.auth === "denied") body += `<section class="card"><h2>This account isn't on Heartscore</h2><p class="muted">${esc(S.user && S.user.email)} isn't one of the two accounts set up for Heartscore. Sign in with the account Vignesh set up for you.</p><button data-action="sign-out">Sign out and try another account</button></section>`;
+    else if (S.auth === "denied") body += `<section class="card"><h2>This account isn't on Heartscore</h2><p class="muted">${esc(S.user && S.user.email)} isn't one of the two accounts set up for Heartscore. Sign in with the account {{H}} set up for you.</p><button data-action="sign-out">Sign out and try another account</button></section>`;
     else if (S.error) body += `<section class="card"><h2>Something went wrong</h2><p class="muted">${esc(S.error)}</p><button class="sm" data-action="sign-out">Sign out</button></section>`;
     else if (!S.ready) body += `<section class="card"><p class="muted">Loading your scores…</p></section>`;
     else body += { today: viewToday, calendar: viewCalendar, challenges: viewChallenges, requests: viewRequests, settings: viewSettings }[S.tab]();
-    main.innerHTML = body;
+    main.innerHTML = TH(body);
 
     Object.keys(keep).forEach((id) => { const el = $(id); if (el && el.type !== "date" || (el && keep[id])) el.value = keep[id]; });
     if (focused && $(focused)) { try { $(focused).focus({ preventScroll: true }); } catch (e) {} }
@@ -612,7 +645,7 @@ input[type="checkbox"] { width: auto; accent-color: var(--accent); }
       .map(([id, label]) => `<button data-action="tab" data-v="${id}" ${S.tab === id ? 'aria-current="page"' : ""}>${I[id]}<span>${label}</span>${id === "requests" && pendingN ? `<span class="badge">${pendingN}</span>` : ""}</button>`).join("");
 
     const sh = $("sheet");
-    if (S.sheet) { sh.innerHTML = viewSheet(S.sheet); sh.hidden = false; } else { sh.hidden = true; sh.innerHTML = ""; }
+    if (S.sheet) { sh.innerHTML = TH(viewSheet(S.sheet)); sh.hidden = false; } else { sh.hidden = true; sh.innerHTML = ""; }
   }
 
   // ---------- actions ----------
@@ -630,7 +663,8 @@ input[type="checkbox"] { width: auto; accent-color: var(--accent); }
         fail: !!($("b-fail-" + i) && $("b-fail-" + i).checked),
         activities: val("b-act-" + i).split("\n").map((l) => l.trim()).filter(Boolean).map((l) => {
           const parts = l.split("|"); const by = (parts[1] || "Either").trim();
-          return { title: parts[0].trim(), by: ["Vignesh", "Uma", "Either"].find((x) => x.toLowerCase() === by.toLowerCase()) || "Either" };
+          const nm = names(), low = by.toLowerCase();
+          return { title: parts[0].trim(), by: low === nm.husband.toLowerCase() || low === "husband" ? "husband" : low === nm.wife.toLowerCase() || low === "wife" ? "wife" : "Either" };
         })
       };
     });
@@ -654,34 +688,34 @@ input[type="checkbox"] { width: auto; accent-color: var(--accent); }
         S.editOpening = false; S.draftMood = undefined; S.draftYest = undefined; clear("op-num", "op-note");
       }, "Today's opening score is set");
     },
-    quick(b) { const q = cfg().quickReasons[Number(b.dataset.i)]; if (q) run(() => addEntry({ date: today(), points: q.points, reason: q.reason, type: "normal", status: "approved", by: "Uma" }), `${signed(q.points)} added`); },
+    quick(b) { const q = cfg().quickReasons[Number(b.dataset.i)]; if (q) run(() => addEntry({ date: today(), points: q.points, reason: q.reason, type: "normal", status: "approved", by: "wife" }), `${signed(q.points)} added`); },
     adj(b) {
       const n = intVal("adj-amt"), reason = val("adj-reason").trim();
       if (!n || n <= 0) return toast("Enter how many points.");
       if (!reason) return toast("Add a short reason.");
       const pts = n * Number(b.dataset.sign);
-      run(async () => { await addEntry({ date: today(), points: pts, reason, type: "normal", status: "approved", by: "Uma" }); clear("adj-amt", "adj-reason"); }, `${signed(pts)} saved`);
+      run(async () => { await addEntry({ date: today(), points: pts, reason, type: "normal", status: "approved", by: "wife" }); clear("adj-amt", "adj-reason"); }, `${signed(pts)} saved`);
     },
     request() {
       const n = intVal("rq-amt"), reason = val("rq-reason").trim();
       if (!n) return toast("Enter how many points you're asking for.");
-      if (!reason) return toast("Add a reason so Uma knows what it's for.");
-      run(async () => { await addEntry({ date: today(), points: n, reason, type: "request", status: "pending", by: "Vignesh" }); clear("rq-amt", "rq-reason"); notify("Uma", `Vignesh asked for ${signed(n)} points`, reason); }, "Sent to Uma");
+      if (!reason) return toast("Add a reason so {{W}} knows what it's for.");
+      run(async () => { await addEntry({ date: today(), points: n, reason, type: "request", status: "pending", by: "husband" }); clear("rq-amt", "rq-reason"); notify("wife", `{{H}} asked for ${signed(n)} points`, reason, "requests"); }, "Sent to {{W}}");
     },
     "req-approve"(b) {
       const id = b.dataset.id, n = intVal("ra-" + id), reply = val("rr-" + id).trim();
       if (n == null) return toast("Enter the points to give.");
       const e0 = S.entries.find((x) => x.id === id) || {};
-      run(async () => { await S.db.doc("entries/" + id).update({ status: "approved", points: n, reply, decidedAt: new Date().toISOString() }); notify("Vignesh", `Uma approved ${signed(n)} points`, [e0.reason, reply].filter(Boolean).join(" · ")); }, "Approved");
+      run(async () => { await S.db.doc("entries/" + id).update({ status: "approved", points: n, reply, decidedAt: new Date().toISOString() }); notify("husband", `{{W}} approved ${signed(n)} points`, [e0.reason, reply].filter(Boolean).join(" · "), "answers"); }, "Approved");
     },
-    "req-decline"(b) { const id = b.dataset.id, reply = val("rr-" + id).trim(), e0 = S.entries.find((x) => x.id === id) || {}; run(async () => { await S.db.doc("entries/" + id).update({ status: "declined", reply, decidedAt: new Date().toISOString() }); notify("Vignesh", `Uma declined your ${signed(Number(e0.points) || 0)} request`, [e0.reason, reply].filter(Boolean).join(" · ")); }, "Declined"); },
+    "req-decline"(b) { const id = b.dataset.id, reply = val("rr-" + id).trim(), e0 = S.entries.find((x) => x.id === id) || {}; run(async () => { await S.db.doc("entries/" + id).update({ status: "declined", reply, decidedAt: new Date().toISOString() }); notify("husband", `{{W}} declined your ${signed(Number(e0.points) || 0)} request`, [e0.reason, reply].filter(Boolean).join(" · "), "answers"); }, "Declined"); },
     "activity-done"(b) {
       const k = b.dataset.k, a = activityFor(k);
       run(() => saveDay(k, { activityDone: true, activityTitle: a && a.act ? a.act.title : "", activityDoneBy: role(), activityDoneAt: new Date().toISOString() }), "Activity done");
     },
     "close-day"() {
       const s = scoreFor(today()), b = bandFor(s);
-      run(async () => { await saveDay(today(), { closed: true, closedAt: new Date().toISOString(), final: s, closeNotified: true }); notify("Vignesh", `Today closed at ${s} · ${b ? b.name : ""}`, b && b.fail ? "That's a fail day." : "Open Heartscore for the full report."); }, "Day closed. The report is in the calendar.");
+      run(async () => { await saveDay(today(), { closed: true, closedAt: new Date().toISOString(), final: s, closeNotified: true }); notify("husband", `Today closed at ${s} · ${b ? b.name : ""}`, b && b.fail ? "That's a fail day." : "Open Heartscore for the full report.", "dayClosed"); }, "Day closed. The report is in the calendar.");
     },
     reopen() { run(() => saveDay(today(), { closed: false }), "Day reopened"); },
     month(b) { const [y, m] = S.month.split("-").map(Number); const d = new Date(y, m - 1 + Number(b.dataset.d), 1); S.month = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; loadMonth(S.month); render(); },
@@ -697,18 +731,18 @@ input[type="checkbox"] { width: auto; accent-color: var(--accent); }
       if (!start || !end || end < start) return toast("Check the start and end dates.");
       const doc = { title, type, who: val("ch-who"), target, minScore: intVal("ch-min") || 0, start, end, bonus: intVal("ch-bonus") || 0, reward: val("ch-reward").trim(),
         status: isUma() ? "active" : "pending", progress: 0, rewardGiven: false, createdBy: role(), createdAt: new Date().toISOString() };
-      run(async () => { await S.db.collection("challenges").add(doc); S.newCh = false; clear("ch-title", "ch-reward"); render(); if (!isUma()) notify("Uma", "Vignesh created a challenge", `${title}${doc.reward ? " · reward: " + doc.reward : ""}. Approve it in Heartscore.`); }, isUma() ? "Challenge started" : "Sent to Uma for approval");
+      run(async () => { await S.db.collection("challenges").add(doc); S.newCh = false; clear("ch-title", "ch-reward"); render(); if (!isUma()) notify("wife", "{{H}} created a challenge", `${title}${doc.reward ? " · reward: " + doc.reward : ""}. Approve it in Heartscore.`, "requests"); }, isUma() ? "Challenge started" : "Sent to {{W}} for approval");
     },
-    "ch-approve"(b) { const c = S.challenges.find((x) => x.id === b.dataset.id) || {}; run(async () => { await S.db.doc("challenges/" + b.dataset.id).update({ status: "active" }); notify("Vignesh", "Uma approved your challenge", c.title); }, "Challenge approved"); },
-    "ch-decline"(b) { const c = S.challenges.find((x) => x.id === b.dataset.id) || {}; run(async () => { await S.db.doc("challenges/" + b.dataset.id).update({ status: "declined" }); notify("Vignesh", "Uma declined your challenge", c.title); }, "Challenge declined"); },
+    "ch-approve"(b) { const c = S.challenges.find((x) => x.id === b.dataset.id) || {}; run(async () => { await S.db.doc("challenges/" + b.dataset.id).update({ status: "active" }); notify("husband", "{{W}} approved your challenge", c.title, "answers"); }, "Challenge approved"); },
+    "ch-decline"(b) { const c = S.challenges.find((x) => x.id === b.dataset.id) || {}; run(async () => { await S.db.doc("challenges/" + b.dataset.id).update({ status: "declined" }); notify("husband", "{{W}} declined your challenge", c.title, "answers"); }, "Challenge declined"); },
     "ch-cancel"(b) { run(() => S.db.doc("challenges/" + b.dataset.id).update({ status: "cancelled" }), "Challenge cancelled"); },
     "ch-log"(b) { const c = S.challenges.find((x) => x.id === b.dataset.id); if (c) run(() => S.db.doc("challenges/" + c.id).update({ progress: (Number(c.progress) || 0) + 1 }), "Progress saved"); },
     "ch-confirm"(b) {
       const c = S.challenges.find((x) => x.id === b.dataset.id); if (!c) return;
       run(async () => {
         await S.db.doc("challenges/" + c.id).update({ status: "achieved", achievedOn: today() });
-        if (Number(c.bonus)) await addEntry({ date: today(), points: Number(c.bonus), reason: "Challenge bonus: " + c.title, type: "bonus", status: "approved", by: "Uma" });
-        notify("Vignesh", `Challenge achieved: ${c.title}`, `${signed(Number(c.bonus) || 0)} bonus added${c.reward ? " · reward: " + c.reward : ""}`);
+        if (Number(c.bonus)) await addEntry({ date: today(), points: Number(c.bonus), reason: "Challenge bonus: " + c.title, type: "bonus", status: "approved", by: "wife" });
+        notify("husband", `Challenge achieved: ${c.title}`, `${signed(Number(c.bonus) || 0)} bonus added${c.reward ? " · reward: " + c.reward : ""}`, "answers");
       }, "Achieved! Bonus added to today");
     },
     "band-add"() { readBands(); const last = S.bandDraft[S.bandDraft.length - 1]; S.bandDraft.push({ id: "b" + Date.now(), name: "New band", min: last && last.max != null ? last.max + 1 : 101, max: null, color: "#8E6BB8", fail: false, activities: [] }); render(); },
@@ -719,11 +753,21 @@ input[type="checkbox"] { width: auto; accent-color: var(--accent); }
       for (const b of bs) if (b.max != null && b.max < b.min) return toast(`“${b.name}” ends before it starts.`);
       run(async () => { await saveConfig({ bands: bs }); S.bandDraft = null; render(); }, "Bands saved");
     },
+    "setup-save"() {
+      const wife = val("s-wname").trim(), husband = val("s-hname").trim();
+      if (!wife || !husband) return toast("Enter both names.");
+      const rem = val("s-rem"), close = val("s-close");
+      if (!rem || !close) return toast("Set both times.");
+      if (toMins(close) <= toMins(rem)) return toast("The day close time has to be later than the morning reminder.");
+      const notifyCfg = {}; ["morning", "requests", "answers", "dayClosed"].forEach((k) => { const el = $("s-n-" + k); notifyCfg[k] = !!(el && el.checked); });
+      const first = !S.config;
+      run(async () => { await saveConfig({ names: { wife, husband }, reminder: rem, close, notify: notifyCfg }); render(); }, first ? "All set. Heartscore is ready." : "Saved");
+    },
     "routine-save"() {
       const quick = val("s-quick").split("\n").map((l) => l.trim()).filter(Boolean).map((l) => { const m = l.match(/^([+-]?\d+)\s+(.+)$/); return m ? { points: parseInt(m[1], 10), reason: m[2].trim() } : null; });
       if (quick.some((q) => !q)) return toast("Each quick reason needs a number first, like +5 Called at lunch.");
       const moods = val("s-moods").split(",").map((s) => s.trim()).filter(Boolean);
-      run(() => saveConfig({ reminder: val("s-rem") || DEFAULTS.reminder, close: val("s-close") || DEFAULTS.close, moods: moods.length ? moods : DEFAULTS.moods, quickReasons: quick }), "Saved");
+      run(() => saveConfig({ moods: moods.length ? moods : DEFAULTS.moods, quickReasons: quick }), "Saved");
     },
     "as-uma"() { S.previewUma = true; try { localStorage.setItem("hs-preview-uma", "1"); } catch (e) {} S.tab = "today"; render(); window.scrollTo(0, 0); },
     "as-me"() { S.previewUma = false; try { localStorage.setItem("hs-preview-uma", "0"); } catch (e) {} render(); },
@@ -761,7 +805,7 @@ input[type="checkbox"] { width: auto; accent-color: var(--accent); }
     if (iosNeedsInstall()) return `<div class="banner"><span class="small">For notifications on iPhone, add Heartscore to your Home Screen (Share → Add to Home Screen) and open it from there.</span></div>`;
     if (S.notif === "denied") return `<div class="banner"><span class="small">Notifications are blocked for Heartscore. Allow them in your browser's site settings to get reminders.</span></div>`;
     if (S.notif === "unsupported") return "";
-    return `<div class="banner"><span>${isUma() ? "Get the 7:30 AM reminder and Vignesh's requests." : "Get Uma's answers and the day's final score."}</span><button class="sm primary" data-action="notif-on">Turn on notifications</button></div>`;
+    return `<div class="banner"><span>${isUma() ? `Get the ${fmt12(cfg().reminder)} reminder and {{H}}'s requests.` : "Get {{W}}'s answers and the day's final score."}</span><button class="sm primary" data-action="notif-on">Turn on notifications</button></div>`;
   }
 
   document.addEventListener("click", (e) => {
@@ -785,7 +829,7 @@ input[type="checkbox"] { width: auto; accent-color: var(--accent); }
 
   // ---------- boot ----------
   const CFG = window.HS_CONFIG || {};
-  const EMAILS = { uma: String((CFG.emails || {}).uma || "").toLowerCase(), vignesh: String((CFG.emails || {}).vignesh || "").toLowerCase() };
+  const EMAILS = { wife: String((CFG.emails || {}).wife || "").toLowerCase(), husband: String((CFG.emails || {}).husband || "").toLowerCase() };
   let unsubs = [];
 
   function loadMonth(mk) {
@@ -841,7 +885,7 @@ input[type="checkbox"] { width: auto; accent-color: var(--accent); }
     S.ready = false; S.error = null; S.user = u; S.who = null; S.verifySent = false;
     if (!u) { S.auth = "out"; render(); return; }
     const em = String(u.email || "").toLowerCase();
-    S.who = em && em === EMAILS.uma ? "Uma" : em && em === EMAILS.vignesh ? "Vignesh" : null;
+    S.who = em && em === EMAILS.wife ? "wife" : em && em === EMAILS.husband ? "husband" : null;
     if (!S.who) { S.auth = "denied"; render(); return; }
     if (!u.emailVerified) { S.auth = "verify"; render(); return; }
     S.auth = "in"; render();

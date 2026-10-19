@@ -11,9 +11,14 @@ self.HS_CONFIG = {
   },
   // From Firebase: Project settings → Cloud Messaging → Web Push certificates → Key pair
   vapidKey: "BCRu2dyJ634S0-lZYjIGXI2AdTTYPxDG6rYwuc526NogeRttWpB_xLVCp-qq1evwe7dxxRLevGkObiTaJ0BKxkA",
-  // The two accounts allowed in. Must match the emails in firestore.rules.
+  // The two Google accounts allowed in. Must match the emails in firestore.rules.
   emails: {
-    uma: "amu7792@gmail.com",
-    vignesh: "nvignesh93@gmail.com"
+    wife: "amu7792@gmail.com",
+    husband: "nvignesh93@gmail.com"
+  },
+  // Starting names. You can change them any time in the app's Settings.
+  names: {
+    wife: "Uma",
+    husband: "Vignesh"
   }
 };
